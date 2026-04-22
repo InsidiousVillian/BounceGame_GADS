@@ -208,10 +208,14 @@ function startSpawnInterval() {
   restartSpawnIntervalWithCurrentTier();
 }
 
-function stopShiftAudio() {
+function stopShiftAlarmOnly() {
+  if (typeof SoundManager !== 'undefined' && SoundManager.stopAlarm) SoundManager.stopAlarm();
+}
+
+function stopShiftMusicAndAlarm() {
   if (typeof SoundManager !== 'undefined') {
-    if (SoundManager.stopBgMusic) SoundManager.stopBgMusic();
     if (SoundManager.stopAlarm) SoundManager.stopAlarm();
+    if (SoundManager.stopBgMusic) SoundManager.stopBgMusic();
   }
 }
 
@@ -365,7 +369,8 @@ function triggerGameOver() {
   hideInspectionForPause();
   hidePauseMenu();
   hideMainMenu();
-  stopShiftAudio();
+  stopShiftAlarmOnly();
+  if (typeof SoundManager !== 'undefined' && SoundManager.setMusicMuffled) SoundManager.setMusicMuffled(false);
   gameOverGuestsEl.textContent = String(guestsProcessed);
   populateEndScreenReport('loss', false, true);
   gameOverScreen.classList.remove('hidden');
@@ -378,7 +383,8 @@ function triggerWin() {
   hideInspectionForPause();
   hidePauseMenu();
   hideMainMenu();
-  stopShiftAudio();
+  stopShiftAlarmOnly();
+  if (typeof SoundManager !== 'undefined' && SoundManager.setMusicMuffled) SoundManager.setMusicMuffled(false);
   winGuestsEl.textContent = String(guestsProcessed);
   populateEndScreenReport('win', true, false);
   winScreen.classList.remove('hidden');
@@ -408,7 +414,7 @@ function resetSessionToMenu() {
   resetInspectionMenuLayout();
   punchParticles.length = 0;
   punchSparks.length = 0;
-  stopShiftAudio();
+  stopShiftMusicAndAlarm();
   hidePauseMenu();
   hideEndScreens();
   hideGameHud();
@@ -461,9 +467,11 @@ function togglePause() {
     GameState.currentStatus = STATUS.PAUSED;
     hideInspectionForPause();
     showPauseMenu();
+    if (typeof SoundManager !== 'undefined' && SoundManager.setMusicMuffled) SoundManager.setMusicMuffled(true);
   } else if (GameState.currentStatus === STATUS.PAUSED) {
     GameState.currentStatus = STATUS.PLAYING;
     hidePauseMenu();
+    if (typeof SoundManager !== 'undefined' && SoundManager.setMusicMuffled) SoundManager.setMusicMuffled(false);
   }
 }
 
@@ -471,6 +479,7 @@ function resumeFromPause() {
   if (GameState.currentStatus === STATUS.PAUSED) {
     GameState.currentStatus = STATUS.PLAYING;
     hidePauseMenu();
+    if (typeof SoundManager !== 'undefined' && SoundManager.setMusicMuffled) SoundManager.setMusicMuffled(false);
   }
 }
 

@@ -208,6 +208,36 @@ Sound hooks + atmosphere + shift report: COMPLETE
 
 ---
 
+## Session 13 - 2026-04-22
+
+### Prompt
+Replace audio file placeholders with **Web Audio API** synthesis: **`playPunch()`** (low thump + noise), **`playStamp()`** (click/pop), **`playAlarm()`** (repeating oscillating beep for high chaos), **`startMusic()`** (low-pass sawtooth **thump-thump** bass); wire existing game events; update **TO_DO.md** / **PROMPT_LOG.md**.
+
+### Tasks Completed
+- **`SoundManager.js`:** Lazy **`AudioContext`** + **`resume()`**; **`scheduleBassThump`** (sawtooth → **lowpass** ~340Hz, decay envelope); **`startMusic` / `stopMusic`** (~1.08s bar, two kicks); **`playAlarm`** alternates **~920 / ~1180 Hz** on **380ms** interval; **`playStamp(true)`** duller deny vs approve; **`play(key)`** maps **`sfx_punch`**, **`sfx_stamp_*`**; **`startBgMusic` / `stopBgMusic`** aliased; **`updateChaosAlarm`** unchanged (**>80**).
+- **`game.js`:** No change required — existing **`SoundManager.play`** / **`startBgMusic`** / **`stopBgMusic`** / **`updateChaosAlarm`** calls hit the new synthesis layer.
+- **Docs:** **`TO_DO.md`** — **Web Audio API (synthetic SFX & music)** **[x]**; Session 13 note; project summary updated.
+
+### Status
+Procedural Web Audio SFX + club bass + chaos alarm: COMPLETE
+
+---
+
+## Session 14 - 2026-04-22
+
+### Prompt
+Use **`assets/audio/DavidKBD - Pink Bloom Pack - 02 - Portal to Underworld.ogg`** for music: **Web Audio** **lowpass** (**~400 Hz** muffled vs bypass **clear**); muffled on **menu/outside** behavior via **PAUSED**; **clear** in-club and on **Game Over / Win**; start on **START SHIFT**; update **PROMPT_LOG** / **TO_DO**.
+
+### Tasks Completed
+- **`SoundManager.js`:** **`HTMLAudioElement`** loop + **`createMediaElementSource`** → **`BiquadFilterNode`** (**`type: 'lowpass'`**, **`Q` ~0.85**) → **`GainNode`** → destination; **`setMusicMuffled(bool)`** ramps cutoff **400 Hz** vs **22 kHz**; **`startMusic`** resets track and **`play()`** after **`AudioContext.resume()`**; synthetic **thump-thump** removed; SFX unchanged.
+- **`game.js`:** **`stopShiftAlarmOnly`** on **win/loss** (music continues, **clear**); **`stopShiftMusicAndAlarm`** on **menu reset**; **ESC pause** → **`setMusicMuffled(true)`**; **resume** → **`false`**; **START SHIFT** still calls **`startBgMusic`** (user gesture).
+- **Docs:** **`TO_DO.md`** — **File-based club music** **[x]**; Session 14; project summary below.
+
+### Status
+OGG club track + dynamic lowpass routing: COMPLETE
+
+---
+
 ## Project summary — The Velvet Rope (bouncer shift simulator)
 
-Vanilla **HTML5 Canvas** + **DOM** UI: **NPCSystem** generates guests (IDs, minors, aggro); queue at **bouncer station**; **PVC ID card** inspection (drag, seal, shape portraits); **Let In / Deny** drives **Vibe** & **Chaos**; deny can turn **aggressive** with **punch** combat and **particles**; **Call Security** tactical cooldown; **difficulty** scales every **30s**; **AssetManager** sprite placeholders (**background**, **NPC**, **POW**); **SoundManager** ready for audio files; **flow** menu / pause / win / loss with **shift report**; **vignette**, **scanlines**, and **vibe-synced** door glow for polish.
+Vanilla **HTML5 Canvas** + **DOM** UI: **NPCSystem** generates guests (IDs, minors, aggro); queue at **bouncer station**; **PVC ID card** inspection (drag, seal, shape portraits); **Let In / Deny** drives **Vibe** & **Chaos**; deny can turn **aggressive** with **punch** combat and **particles**; **Call Security** tactical cooldown; **difficulty** scales every **30s**; **AssetManager** sprite placeholders (**background**, **NPC**, **POW**); **SoundManager** — procedural **SFX** (punch, stamps, chaos alarm) plus **DavidKBD *Portal to Underworld*** loop routed through a **lowpass** (muffled when **paused**, full on shift + end screens); **flow** menu / pause / win / loss with **shift report**; **vignette**, **scanlines**, and **vibe-synced** door glow for polish.
