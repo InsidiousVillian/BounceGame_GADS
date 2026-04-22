@@ -35,6 +35,8 @@ const AGGRO_BONUS_PER_TIER = 0.1;
 const SECURITY_COOLDOWN_SEC = 15;
 const SECURITY_CHAOS_REDUCE = 25;
 const SECURITY_VIBE_COST = 20;
+const SHIFT_EARN_PER_LEGIT_LET_IN = 10;
+const SHIFT_FINE_MINOR_LET_IN = 50;
 
 const GameState = {
   vibe: 50,
@@ -86,6 +88,9 @@ let shiftTimerRemaining = SHIFT_LENGTH_SEC;
 let guestsProcessed = 0;
 let guestsLetIn = 0;
 let guestsDenied = 0;
+let shiftLegitLetInCount = 0;
+let shiftMinorLetInCount = 0;
+let stationPulsePhase = 0;
 let securityCooldownRemaining = 0;
 let appliedDifficultyTier = -1;
 let currentSpawnIntervalMs = BASE_SPAWN_MS;
@@ -110,6 +115,8 @@ const securityCdOverlay = document.getElementById('security-cd-overlay');
 const vibeBar = document.getElementById('vibe-bar');
 const chaosBar = document.getElementById('chaos-bar');
 const hudEl = document.getElementById('hud');
+const bouncerStation = document.getElementById('bouncer-station');
+const stationLabelEl = bouncerStation ? bouncerStation.querySelector('.station-label') : null;
 
 const mainMenu = document.getElementById('main-menu');
 const pauseMenu = document.getElementById('pause-menu');
@@ -201,6 +208,85 @@ function startSpawnInterval() {
   restartSpawnIntervalWithCurrentTier();
 }
 
+function stopShiftAudio() {
+  if (typeof SoundManager !== 'undefined') {
+    if (SoundManager.stopBgMusic) SoundManager.stopBgMusic();
+    if (SoundManager.stopAlarm) SoundManager.stopAlarm();
+  }
+}
+
+function syncChaosAlarmFromHud() {
+  if (typeof SoundManager !== 'undefined' && SoundManager.updateChaosAlarm) {
+    SoundManager.updateChaosAlarm(GameState.chaos);
+  }
+}
+
+function updateBouncerStationGlow(dt) {
+  if (!bouncerStation) return;
+  const step = typeof dt === 'number' && dt > 0 ? dt : 0.016;
+  stationPulsePhase += step * (1.15 + GameState.vibe * 0.018);
+  const pulse = 0.52 + 0.48 * Math.sin(stationPulsePhase);
+  const t = GameState.vibe / 100;
+  const hue = 265 + t * 85;
+  const sat = 62 + t * 28;
+  const light = 52 + t * 10;
+  const borderA = 0.52 + pulse * t * 0.43;
+  const glowOut = (0.18 + t * 0.82) * pulse;
+  const insetA = 0.08 + t * 0.22 + pulse * 0.12;
+  bouncerStation.style.borderColor = `hsla(${hue}, ${sat}%, ${light}%, ${borderA})`;
+  bouncerStation.style.boxShadow = `0 0 0 1px rgba(0, 0, 0, 0.5), inset 0 0 48px hsla(${hue}, ${sat}%, 42%, ${insetA}), 0 0 ${24 + glowOut * 52}px hsla(${hue}, ${sat}%, 55%, ${glowOut * 0.85})`;
+  if (stationLabelEl) {
+    stationLabelEl.style.color = `hsl(${hue}, ${sat}%, ${72 + t * 8}%)`;
+    stationLabelEl.style.textShadow = `0 0 ${10 + glowOut * 14}px hsla(${hue}, ${sat}%, 55%, ${0.45 + glowOut * 0.35})`;
+  }
+}
+
+function computeShiftEconomics() {
+  const earnings = shiftLegitLetInCount * SHIFT_EARN_PER_LEGIT_LET_IN;
+  const fines = shiftMinorLetInCount * SHIFT_FINE_MINOR_LET_IN;
+  const net = earnings - fines;
+  return { earnings, fines, net };
+}
+
+function shiftGradeLetter(net, chaosShutdown, wonShift) {
+  if (chaosShutdown || !wonShift) return 'F';
+  if (net >= 350) return 'S';
+  if (net >= 220) return 'A';
+  if (net >= 120) return 'B';
+  if (net >= 0) return 'C';
+  return 'F';
+}
+
+function formatShiftMoney(n) {
+  const v = Math.round(Math.abs(n));
+  return `${n < 0 ? '-' : ''}$${v}`;
+}
+
+function setShiftGradeClass(el, grade) {
+  if (!el) return;
+  el.classList.remove('shift-grade--s', 'shift-grade--a', 'shift-grade--b', 'shift-grade--c', 'shift-grade--f');
+  el.classList.add(`shift-grade--${grade.toLowerCase()}`);
+}
+
+function populateEndScreenReport(screenKey, wonShift, chaosShutdown) {
+  const { earnings, fines, net } = computeShiftEconomics();
+  const grade = shiftGradeLetter(net, chaosShutdown, wonShift);
+  const ge = document.getElementById(`report-earnings-${screenKey}`);
+  const gf = document.getElementById(`report-fines-${screenKey}`);
+  const gn = document.getElementById(`report-net-${screenKey}`);
+  const gg = document.getElementById(`report-grade-${screenKey}`);
+  if (ge) ge.textContent = formatShiftMoney(earnings);
+  if (gf) gf.textContent = fines > 0 ? `-$${Math.round(fines)}` : '$0';
+  if (gn) {
+    gn.textContent = formatShiftMoney(net);
+    gn.style.color = net >= 0 ? '#b9f6ca' : '#ff8a80';
+  }
+  if (gg) {
+    gg.textContent = grade;
+    setShiftGradeClass(gg, grade);
+  }
+}
+
 function updateTimerAndGuestHud() {
   if (timerSecondsDisplay) {
     timerSecondsDisplay.textContent = String(Math.max(0, Math.ceil(shiftTimerRemaining)));
@@ -279,7 +365,9 @@ function triggerGameOver() {
   hideInspectionForPause();
   hidePauseMenu();
   hideMainMenu();
+  stopShiftAudio();
   gameOverGuestsEl.textContent = String(guestsProcessed);
+  populateEndScreenReport('loss', false, true);
   gameOverScreen.classList.remove('hidden');
 }
 
@@ -290,7 +378,9 @@ function triggerWin() {
   hideInspectionForPause();
   hidePauseMenu();
   hideMainMenu();
+  stopShiftAudio();
   winGuestsEl.textContent = String(guestsProcessed);
+  populateEndScreenReport('win', true, false);
   winScreen.classList.remove('hidden');
 }
 
@@ -306,6 +396,9 @@ function resetSessionToMenu() {
   guestsProcessed = 0;
   guestsLetIn = 0;
   guestsDenied = 0;
+  shiftLegitLetInCount = 0;
+  shiftMinorLetInCount = 0;
+  stationPulsePhase = 0;
   securityCooldownRemaining = 0;
   appliedDifficultyTier = -1;
   currentSpawnIntervalMs = BASE_SPAWN_MS;
@@ -315,6 +408,7 @@ function resetSessionToMenu() {
   resetInspectionMenuLayout();
   punchParticles.length = 0;
   punchSparks.length = 0;
+  stopShiftAudio();
   hidePauseMenu();
   hideEndScreens();
   hideGameHud();
@@ -340,6 +434,9 @@ function startShift() {
   guestsProcessed = 0;
   guestsLetIn = 0;
   guestsDenied = 0;
+  shiftLegitLetInCount = 0;
+  shiftMinorLetInCount = 0;
+  stationPulsePhase = 0;
   securityCooldownRemaining = 0;
   appliedDifficultyTier = -1;
   currentSpawnIntervalMs = BASE_SPAWN_MS;
@@ -349,6 +446,7 @@ function startShift() {
   resetInspectionMenuLayout();
   punchParticles.length = 0;
   punchSparks.length = 0;
+  if (typeof SoundManager !== 'undefined' && SoundManager.startBgMusic) SoundManager.startBgMusic();
   showGameHud();
   updateHUD();
   updateTimerAndGuestHud();
@@ -412,7 +510,8 @@ function randomFrom(arr) {
 }
 
 function playCombatSound() {
-  console.log('POW!');
+  if (typeof SoundManager !== 'undefined' && SoundManager.play) SoundManager.play('sfx_punch');
+  else console.log('POW!');
 }
 
 function isLegitGuest(npc) {
@@ -959,6 +1058,7 @@ function updateHUD() {
   vibeBar.style.width = GameState.vibe + '%';
   chaosBar.style.width = GameState.chaos + '%';
   updateSecurityButton();
+  syncChaosAlarmFromHud();
 }
 
 function hideInspection() {
@@ -1061,6 +1161,11 @@ function onLetIn() {
     GameState.addVibe(npc.vibeContribution);
   }
 
+  if (!badLetIn) shiftLegitLetInCount += 1;
+  else if (npc.isMinor) shiftMinorLetInCount += 1;
+
+  if (typeof SoundManager !== 'undefined' && SoundManager.play) SoundManager.play('sfx_stamp_approve');
+
   guestsLetIn += 1;
   updateTimerAndGuestHud();
   removeNpc(npc);
@@ -1071,6 +1176,8 @@ function onDeny() {
   if (!isPlayingSession()) return;
   const npc = GameState.activeNpc;
   if (!npc) return;
+
+  if (typeof SoundManager !== 'undefined' && SoundManager.play) SoundManager.play('sfx_stamp_deny');
 
   if (isLegitGuest(npc)) {
     GameState.addChaos(5);
@@ -1175,6 +1282,7 @@ function gameLoop(timestamp) {
 
   if (GameState.currentStatus === STATUS.PLAYING || GameState.currentStatus === STATUS.PAUSED) {
     tickCombatFx(dt);
+    updateBouncerStationGlow(dt);
   }
 
   render();
@@ -1249,6 +1357,24 @@ function render() {
 
   for (const npc of npcs) npc.draw(ctx);
   drawCombatFx(ctx);
+  drawScanlines();
+}
+
+function drawScanlines() {
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.save();
+  ctx.globalAlpha = 0.12;
+  for (let y = 0; y < h; y += 3) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.fillRect(0, y, w, 1);
+  }
+  ctx.globalAlpha = 0.05;
+  for (let y = 1; y < h; y += 3) {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.fillRect(0, y, w, 1);
+  }
+  ctx.restore();
 }
 
 function init() {

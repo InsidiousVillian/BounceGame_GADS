@@ -190,3 +190,24 @@ Visual ID card + portraits + seal variants + draggable UI: COMPLETE
 
 ### Status
 Sprite pipeline + preload + punch VFX: COMPLETE
+
+---
+
+## Session 12 - 2026-04-22
+
+### Prompt
+**Sound** placeholders (**`SoundManager.js`**): bg loop, punch, approve/deny stamps, chaos **>80** alarm; **juice**: CSS **vignette**, canvas **scanlines**, **bouncer station** glow vs **Vibe**; **Shift report** on end screens (earnings, fines, grade **S–F**); finalize **TO_DO** / **PROMPT_LOG**.
+
+### Tasks Completed
+- **`SoundManager.js`:** **`play`**, **`startBgMusic` / `stopBgMusic`** (interval + **`console.log`** stand-in for bass loop), **`updateChaosAlarm`** (**`> 80`**), **`register(key,url)`** for **`HTMLAudioElement`** when assets exist; **`sfx_punch`**, **`sfx_stamp_approve`**, **`sfx_stamp_deny`**, **`sfx_alarm`** messages.
+- **`index.html` / `style.css`:** **`#screen-vignette`** radial mask; **shift report** tables on win/loss; **`.shift-grade--*`** colors.
+- **`game.js`:** **`shiftLegitLetInCount`** / **`shiftMinorLetInCount`**, **`$10`** / **`$50`** economics, **`populateEndScreenReport`**, grade **S/A/B/C/F** (shutdown or loss → **F**); **`updateBouncerStationGlow`** + **`drawScanlines`**; hooks in **`onLetIn`**, **`onDeny`**, **`playCombatSound`**, **`updateHUD`**, **`startShift`** / **`stopShiftAudio`** on end + menu reset.
+
+### Status
+Sound hooks + atmosphere + shift report: COMPLETE
+
+---
+
+## Project summary — The Velvet Rope (bouncer shift simulator)
+
+Vanilla **HTML5 Canvas** + **DOM** UI: **NPCSystem** generates guests (IDs, minors, aggro); queue at **bouncer station**; **PVC ID card** inspection (drag, seal, shape portraits); **Let In / Deny** drives **Vibe** & **Chaos**; deny can turn **aggressive** with **punch** combat and **particles**; **Call Security** tactical cooldown; **difficulty** scales every **30s**; **AssetManager** sprite placeholders (**background**, **NPC**, **POW**); **SoundManager** ready for audio files; **flow** menu / pause / win / loss with **shift report**; **vignette**, **scanlines**, and **vibe-synced** door glow for polish.

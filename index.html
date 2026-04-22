@@ -11,6 +11,7 @@
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
+  <div id="screen-vignette" class="screen-vignette" aria-hidden="true"></div>
 
   <div id="ui-overlay">
     <div id="game-hud-wrap" class="hidden">
@@ -111,6 +112,15 @@
         <h2 id="gameover-title" class="flow-title flow-title--loss">GAME OVER</h2>
         <p class="flow-message">THE CLUB WAS SHUT DOWN. TOO MUCH CHAOS.</p>
         <p class="flow-score">Guests processed: <strong id="game-over-guests">0</strong></p>
+        <div class="shift-report" aria-label="Shift report">
+          <h3 class="shift-report-title">Shift report</h3>
+          <table class="shift-report-table">
+            <tr><th scope="row">Total earnings</th><td id="report-earnings-loss">$0</td></tr>
+            <tr><th scope="row">Fines</th><td id="report-fines-loss">$0</td></tr>
+            <tr><th scope="row">Net</th><td id="report-net-loss">$0</td></tr>
+            <tr class="shift-report-grade-row"><th scope="row">Final grade</th><td id="report-grade-loss" class="shift-grade">—</td></tr>
+          </table>
+        </div>
         <button type="button" class="btn-flow btn-flow-primary" id="btn-retry-loss">RETRY</button>
       </div>
     </div>
@@ -120,6 +130,15 @@
         <h2 id="win-title" class="flow-title flow-title--win">SHIFT COMPLETE</h2>
         <p class="flow-message">You survived the night. The rope holds.</p>
         <p class="flow-score">Guests processed: <strong id="win-guests">0</strong></p>
+        <div class="shift-report" aria-label="Shift report">
+          <h3 class="shift-report-title">Shift report</h3>
+          <table class="shift-report-table">
+            <tr><th scope="row">Total earnings</th><td id="report-earnings-win">$0</td></tr>
+            <tr><th scope="row">Fines</th><td id="report-fines-win">$0</td></tr>
+            <tr><th scope="row">Net</th><td id="report-net-win">$0</td></tr>
+            <tr class="shift-report-grade-row"><th scope="row">Final grade</th><td id="report-grade-win" class="shift-grade">—</td></tr>
+          </table>
+        </div>
         <button type="button" class="btn-flow btn-flow-primary" id="btn-retry-win">RETRY</button>
       </div>
     </div>
@@ -135,6 +154,7 @@
   </div>
 
   <script src="AssetManager.js"></script>
+  <script src="SoundManager.js"></script>
   <script src="NPCSystem.js"></script>
   <script src="game.js"></script>
 </body>

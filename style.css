@@ -14,6 +14,20 @@ html, body {
   color: #e0e0e0;
 }
 
+/* ── Screen vignette (focus center) ───────────────────────── */
+.screen-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 85% 75% at 50% 45%,
+    transparent 35%,
+    rgba(0, 0, 0, 0.22) 62%,
+    rgba(0, 0, 0, 0.72) 100%
+  );
+}
+
 /* ── Canvas ────────────────────────────────────────────────── */
 #gameCanvas {
   position: fixed;
@@ -128,7 +142,7 @@ html, body {
   }
 }
 
-/* ── Bouncer Station ───────────────────────────────────────── */
+/* ── Bouncer Station (dynamic neon via inline style from game.js) ─ */
 #bouncer-station {
   position: absolute;
   left: 50%;
@@ -148,6 +162,7 @@ html, body {
     0 0 0 1px rgba(0, 0, 0, 0.5),
     inset 0 0 40px rgba(123, 47, 247, 0.12),
     0 0 28px rgba(123, 47, 247, 0.25);
+  transition: border-color 0.35s ease, box-shadow 0.35s ease;
 }
 
 .station-label {
@@ -159,6 +174,7 @@ html, body {
   line-height: 1.4;
   padding: 0 8px;
   text-shadow: 0 0 12px rgba(123, 47, 247, 0.6);
+  transition: color 0.35s ease, text-shadow 0.35s ease;
 }
 
 /* ── Inspection: PVC ID card + draggable ─────────────────── */
@@ -753,6 +769,84 @@ html, body {
 .flow-score strong {
   color: #fff;
   font-size: 1.15em;
+}
+
+.shift-report {
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto 22px;
+  padding: 16px 18px;
+  text-align: left;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.shift-report-title {
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #777;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.shift-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.shift-report-table th {
+  font-weight: normal;
+  color: #888;
+  text-align: left;
+  padding: 5px 10px 5px 0;
+  width: 50%;
+}
+
+.shift-report-table td {
+  text-align: right;
+  font-family: 'Share Tech Mono', 'Courier New', monospace;
+  color: #eaeaea;
+  padding: 5px 0;
+}
+
+.shift-report-grade-row th,
+.shift-report-grade-row td {
+  padding-top: 11px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.shift-grade {
+  font-size: 1.65em;
+  font-weight: bold;
+  letter-spacing: 0.2em;
+}
+
+.shift-grade--s {
+  color: #ffe082;
+  text-shadow: 0 0 14px rgba(255, 213, 79, 0.45);
+}
+
+.shift-grade--a {
+  color: #b9f6ca;
+  text-shadow: 0 0 12px rgba(0, 230, 118, 0.35);
+}
+
+.shift-grade--b {
+  color: #81d4fa;
+  text-shadow: 0 0 10px rgba(100, 200, 255, 0.3);
+}
+
+.shift-grade--c {
+  color: #ffcc80;
+  text-shadow: 0 0 8px rgba(255, 160, 80, 0.25);
+}
+
+.shift-grade--f {
+  color: #ff8a80;
+  text-shadow: 0 0 12px rgba(255, 23, 68, 0.35);
 }
 
 kbd {
