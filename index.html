@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>The Velvet Rope</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -47,32 +50,49 @@
     </div>
 
     <div id="inspection-menu" class="hidden" role="dialog" aria-modal="true" aria-labelledby="inspection-title">
-      <div class="inspection-folder">
-        <div class="folder-tab" id="inspection-title">ENTRY DOSSIER</div>
-        <div class="folder-body">
-          <div class="folder-clip" aria-hidden="true"></div>
-          <div class="folder-paper-texture"></div>
-          <div class="inspection-fields">
-            <div class="field-block">
-              <span class="field-label field-label--neon">Name</span>
-              <p class="field-value" id="inspect-name">—</p>
+      <div class="id-card">
+        <div class="id-card-drag-handle" id="id-card-drag-handle" title="Drag to move">
+          <span class="id-card-drag-grip" aria-hidden="true"></span>
+          <span class="id-card-drag-title" id="inspection-title">STATE ISSUED IDENTIFICATION</span>
+        </div>
+        <div class="id-card-body">
+          <div class="id-card-portrait-column">
+            <div class="id-card-portrait-frame">
+              <div id="inspect-portrait-host" class="id-card-portrait-host"></div>
             </div>
-            <div class="field-block">
-              <span class="field-label field-label--neon">Age</span>
-              <p class="field-value" id="inspect-age">—</p>
-            </div>
-            <div class="field-block">
-              <span class="field-label field-label--neon">ID Validity</span>
-              <p class="field-value" id="inspect-id-validity">—</p>
-            </div>
-            <div class="field-block">
-              <span class="field-label field-label--neon">Reason for Entry</span>
-              <p class="field-value field-value--multiline" id="inspect-reason">—</p>
-            </div>
+            <span class="id-card-portrait-label">PHOTO</span>
           </div>
-          <div class="inspection-actions">
-            <button type="button" class="btn-neon btn-let-in" id="btn-let-in">Let In</button>
-            <button type="button" class="btn-neon btn-deny" id="btn-deny">Deny</button>
+          <div class="id-card-main">
+            <div class="id-card-seal-row">
+              <span class="id-card-seal-caption">SECURITY SEAL</span>
+              <div id="inspect-security-seal" class="inspect-seal" role="img" aria-label="ID security hologram"></div>
+            </div>
+            <div class="id-card-fields">
+              <div class="field-block field-block--compact">
+                <span class="field-label id-card-label">Document No.</span>
+                <p class="field-value field-value--official" id="inspect-id-number">—</p>
+              </div>
+              <div class="field-block field-block--compact">
+                <span class="field-label id-card-label">Full name</span>
+                <p class="field-value field-value--official" id="inspect-name">—</p>
+              </div>
+              <div class="field-block field-block--compact">
+                <span class="field-label id-card-label">Age</span>
+                <p class="field-value field-value--official field-value--age" id="inspect-age">—</p>
+              </div>
+              <div class="field-block field-block--compact">
+                <span class="field-label id-card-label">ID status</span>
+                <p class="field-value" id="inspect-id-validity">—</p>
+              </div>
+              <div class="field-block">
+                <span class="field-label id-card-label">Stated reason</span>
+                <p class="field-value field-value--multiline field-value--reason" id="inspect-reason">—</p>
+              </div>
+            </div>
+            <div class="inspection-actions">
+              <button type="button" class="btn-neon btn-let-in" id="btn-let-in">Let In</button>
+              <button type="button" class="btn-neon btn-deny" id="btn-deny">Deny</button>
+            </div>
           </div>
         </div>
       </div>

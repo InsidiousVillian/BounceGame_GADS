@@ -158,3 +158,19 @@ Tactical **Call Security** ability (HUD button + Space), **−25 chaos** / **−
 
 ### Status
 Call Security + 30s difficulty tiers + HUD timer & guest stats: COMPLETE
+
+---
+
+## Session 10 - 2026-04-22
+
+### Prompt
+Redesign inspection from text list to a **visual ID card**: PVC-style layout with left **portrait** (abstract colored shapes), **monospace / official** typography for name and ID number, **security seal / hologram** (gold if valid; if fake, **50%** missing slot vs **broken** red icon), **draggable** card via top handle; update **TO_DO.md** and **PROMPT_LOG.md**.
+
+### Tasks Completed
+- **`style.css` / `index.html`:** **`#inspection-menu`** wraps **`.id-card`** — dark **drag handle** (“STATE ISSUED IDENTIFICATION”), **`.id-card-body`** with **portrait frame** + detail column; **`.field-value--official`** uses **Share Tech Mono** (Google Font link); seal row + **Let In** / **Deny** unchanged behavior.
+- **`NPCSystem.js`:** **`generatePortraitShapes()`** (3–4 circles/triangle), **`portraitShapesToSvg()`**, embedded in **`generateNpcData`** as **`portraitSvg`**; **`securitySealVariant`**: **`valid`** | **`missing`** | **`broken`** (fake IDs: **50%** each for missing vs broken).
+- **`game.js`:** **`inspect-portrait-host`**, **`inspect-id-number`**, **`inspect-security-seal`**; **`applySecuritySeal()`** with inline gold / broken SVGs; **`mousedown`** drag on **`#id-card-drag-handle`**, clamped to viewport; **`resetInspectionMenuLayout()`** on show / hide / pause / menu reset so the card recenters when reopened.
+- **Docs:** **`TO_DO.md`** — **Advanced ID Visuals** **[x]**; Session 10 note; this entry.
+
+### Status
+Visual ID card + portraits + seal variants + draggable UI: COMPLETE

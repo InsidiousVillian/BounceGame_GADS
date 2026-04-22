@@ -120,15 +120,21 @@ const gameOverGuestsEl = document.getElementById('game-over-guests');
 const winGuestsEl = document.getElementById('win-guests');
 
 const inspectionMenu = document.getElementById('inspection-menu');
+const inspectPortraitHost = document.getElementById('inspect-portrait-host');
+const inspectSecuritySeal = document.getElementById('inspect-security-seal');
+const inspectIdNumber = document.getElementById('inspect-id-number');
 const inspectName = document.getElementById('inspect-name');
 const inspectAge = document.getElementById('inspect-age');
 const inspectValidity = document.getElementById('inspect-id-validity');
 const inspectReason = document.getElementById('inspect-reason');
+const idCardDragHandle = document.getElementById('id-card-drag-handle');
 const btnLetIn = document.getElementById('btn-let-in');
 const btnDeny = document.getElementById('btn-deny');
 
 let spawnIntervalId = null;
 let lastFrameTime = 0;
+
+const inspectMenuDrag = { active: false, offsetX: 0, offsetY: 0 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Flow & session
@@ -293,6 +299,7 @@ function resetSessionToMenu() {
   lastFrameTime = 0;
 
   inspectionMenu.classList.add('hidden');
+  resetInspectionMenuLayout();
   hidePauseMenu();
   hideEndScreens();
   hideGameHud();
@@ -324,6 +331,7 @@ function startShift() {
   lastFrameTime = 0;
 
   inspectionMenu.classList.add('hidden');
+  resetInspectionMenuLayout();
   showGameHud();
   updateHUD();
   updateTimerAndGuestHud();
@@ -353,6 +361,7 @@ function resumeFromPause() {
 
 function hideInspectionForPause() {
   inspectionMenu.classList.add('hidden');
+  resetInspectionMenuLayout();
   if (GameState.activeNpc && GameState.activeNpc.state === STATE_INSPECTING) {
     GameState.activeNpc.state = STATE_AT_STATION;
   }
@@ -397,6 +406,104 @@ function formatValidityLine(npc) {
   if (!npc.isValidID) return { text: 'FORGED — FAKE ID', cls: 'field-value field-value--fake' };
   if (npc.isMinor) return { text: 'VALID ID — MINOR (UNDER 21)', cls: 'field-value field-value--legit field-value--minor-warn' };
   return { text: 'VERIFIED — LEGIT', cls: 'field-value field-value--legit' };
+}
+
+function sealSvgValid() {
+  const gid = `g${Math.random().toString(36).slice(2, 10)}`;
+  return `<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <linearGradient id="${gid}-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff8e1"/><stop offset="45%" stop-color="#ffc107"/><stop offset="100%" stop-color="#ff8f00"/>
+    </linearGradient>
+    <filter id="${gid}-glow"><feGaussianBlur stdDeviation="1.05" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <path d="M20 3 L35 8.5 V19.5 Q35 29 20 36 Q5 29 5 19.5 V8.5 Z" fill="url(#${gid}-gold)" filter="url(#${gid}-glow)" stroke="#5d4037" stroke-width="0.75"/>
+  <path d="M20 13 L21.6 17 L26 17.5 L22.6 20.4 L23.6 25 L20 22.8 L16.4 25 L17.4 20.4 L14 17.5 L18.4 17 Z" fill="#fffde7" opacity="0.95"/>
+</svg>`;
+}
+
+function sealSvgBroken() {
+  const id = `b${Math.random().toString(36).slice(2, 9)}`;
+  return `<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <linearGradient id="${id}-r" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ff7961"/><stop offset="100%" stop-color="#b71c1c"/>
+    </linearGradient>
+  </defs>
+  <path d="M20 3 L35 8.5 V19.5 Q35 29 20 36 Q5 29 5 19.5 V8.5 Z" fill="url(#${id}-r)" stroke="#3e2723" stroke-width="0.75" opacity="0.93"/>
+  <path d="M9 11 L30 27 M30 11 L9 27" stroke="#3e2723" stroke-width="2.4" stroke-linecap="round" opacity="0.9"/>
+</svg>`;
+}
+
+function applySecuritySeal(el, variant) {
+  if (!el) return;
+  const v = variant === 'broken' || variant === 'missing' ? variant : 'valid';
+  el.className = 'inspect-seal inspect-seal--' + v;
+  if (v === 'valid') el.innerHTML = sealSvgValid();
+  else if (v === 'broken') el.innerHTML = sealSvgBroken();
+  else el.innerHTML = '<span class="inspect-seal-missing-label">NO HOLOGRAM</span>';
+}
+
+function resetInspectMenuDragListeners() {
+  inspectMenuDrag.active = false;
+  if (idCardDragHandle) idCardDragHandle.classList.remove('is-dragging');
+  document.removeEventListener('mousemove', onInspectDragMove);
+  document.removeEventListener('mouseup', onInspectDragEnd);
+}
+
+function resetInspectionMenuLayout() {
+  if (!inspectionMenu) return;
+  resetInspectMenuDragListeners();
+  inspectionMenu.classList.remove('id-card-dragging-mode');
+  inspectionMenu.style.left = '';
+  inspectionMenu.style.top = '';
+}
+
+function ensureInspectMenuPixelPosition() {
+  if (!inspectionMenu || inspectionMenu.classList.contains('id-card-dragging-mode')) return;
+  const rect = inspectionMenu.getBoundingClientRect();
+  inspectionMenu.classList.add('id-card-dragging-mode');
+  inspectionMenu.style.transform = 'none';
+  inspectionMenu.style.left = `${rect.left}px`;
+  inspectionMenu.style.top = `${rect.top}px`;
+}
+
+function clampInspectMenuPosition(left, top) {
+  const pad = 10;
+  const w = inspectionMenu.offsetWidth || 320;
+  const h = inspectionMenu.offsetHeight || 280;
+  const maxL = Math.max(pad, window.innerWidth - w - pad);
+  const maxT = Math.max(pad, window.innerHeight - h - pad);
+  return {
+    left: Math.max(pad, Math.min(left, maxL)),
+    top: Math.max(pad, Math.min(top, maxT)),
+  };
+}
+
+function onInspectDragStart(e) {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  ensureInspectMenuPixelPosition();
+  const rect = inspectionMenu.getBoundingClientRect();
+  inspectMenuDrag.active = true;
+  inspectMenuDrag.offsetX = e.clientX - rect.left;
+  inspectMenuDrag.offsetY = e.clientY - rect.top;
+  if (idCardDragHandle) idCardDragHandle.classList.add('is-dragging');
+  document.addEventListener('mousemove', onInspectDragMove);
+  document.addEventListener('mouseup', onInspectDragEnd);
+}
+
+function onInspectDragMove(e) {
+  if (!inspectMenuDrag.active) return;
+  const left = e.clientX - inspectMenuDrag.offsetX;
+  const top = e.clientY - inspectMenuDrag.offsetY;
+  const c = clampInspectMenuPosition(left, top);
+  inspectionMenu.style.left = `${c.left}px`;
+  inspectionMenu.style.top = `${c.top}px`;
+}
+
+function onInspectDragEnd() {
+  resetInspectMenuDragListeners();
 }
 
 function notifyChaosIncrease(amount) {
@@ -716,6 +823,7 @@ function updateHUD() {
 
 function hideInspection() {
   inspectionMenu.classList.add('hidden');
+  resetInspectionMenuLayout();
   if (GameState.activeNpc && GameState.activeNpc.state === STATE_INSPECTING) {
     GameState.activeNpc.state = STATE_AT_STATION;
   }
@@ -726,9 +834,15 @@ function hideInspection() {
 
 function showInspection(npc) {
   if (!isPlayingSession()) return;
+  resetInspectionMenuLayout();
   GameState.activeNpc = npc;
   npc.state = STATE_INSPECTING;
   GameState.isPaused = true;
+
+  if (inspectPortraitHost) {
+    inspectPortraitHost.innerHTML = npc.portraitSvg || '';
+  }
+  if (inspectIdNumber) inspectIdNumber.textContent = npc.idNumber || '—';
 
   inspectName.textContent = npc.name;
   inspectAge.textContent = String(npc.age);
@@ -738,6 +852,14 @@ function showInspection(npc) {
   inspectValidity.className = v.cls;
 
   inspectReason.textContent = npc.reasonForEntry || '—';
+
+  const sealVar =
+    npc.securitySealVariant != null
+      ? npc.securitySealVariant
+      : npc.isValidID
+        ? 'valid'
+        : 'missing';
+  applySecuritySeal(inspectSecuritySeal, sealVar);
 
   inspectionMenu.classList.remove('hidden');
   repositionStationQueue();
@@ -974,6 +1096,8 @@ function init() {
   document.addEventListener('keydown', onKeyDown);
 
   if (btnCallSecurity) btnCallSecurity.addEventListener('click', callSecurity);
+
+  if (idCardDragHandle) idCardDragHandle.addEventListener('mousedown', onInspectDragStart);
 
   btnLetIn.addEventListener('click', onLetIn);
   btnDeny.addEventListener('click', onDeny);
