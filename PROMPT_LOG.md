@@ -142,3 +142,19 @@ Game flow: main menu (**THE VELVET ROPE** / **START SHIFT**), **ESC** pause menu
 
 ### Status
 Menus + win/loss + session reset: COMPLETE
+
+---
+
+## Session 9 - 2026-04-22
+
+### Prompt
+Tactical **Call Security** ability (HUD button + Space), **−25 chaos** / **−20 vibe**, **15s** cooldown with visual recharge; **dynamic difficulty** from **ShiftTimer** (every **30s**: faster spawns, higher **aggressionChance** on new NPCs); HUD **timer** (remaining seconds) + **guest let-in vs denied** counts; update **TO_DO.md** and **PROMPT_LOG.md**.
+
+### Tasks Completed
+- **`game.js`:** `callSecurity()` gated on **PLAYING**, not inspection-paused, vibe **≥20**, cooldown **≤0**; `tickSecurityCooldown(dt)` in **`runSimulationStep`** and while **PAUSED** in **`gameLoop`**; **Space** in **`onKeyDown`**; `guestsLetIn` / `guestsDenied` on **Let In** / **Deny** (including aggro path); `getDifficultyTier()` from shift elapsed (**floor(elapsed/30)**), `syncDifficultyScaling()` restarts spawn interval (**base 6s − tier×1s**, min **2s**), `NPCSystem.generateNpcData(tier * 0.1)` aggro bonus capped at **1**.
+- **`NPCSystem.js`:** `generateNpcData(aggressionBonus)` optional bonus added to rolled aggression, clamped.
+- **`index.html` / `style.css`:** **`#hud-top-center`** timer + guest line; **`#btn-call-security`** + **`#security-cd-overlay`**; **`.btn-security`** / **`.on-cooldown`**.
+- **Docs:** **`TO_DO.md`** — **The Cool Down & Difficulty Scaling** **[x]**; Session 9 note; this entry.
+
+### Status
+Call Security + 30s difficulty tiers + HUD timer & guest stats: COMPLETE

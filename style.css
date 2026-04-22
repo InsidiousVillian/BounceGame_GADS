@@ -392,30 +392,123 @@ html, body {
   pointer-events: none;
 }
 
-.hud-shift-row {
-  margin-bottom: 10px;
+/* Top-center timer + guest stats */
+.hud-top-center {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  text-align: center;
 }
 
-.shift-timer-block {
+.hud-timer-block-center {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  justify-content: center;
+  gap: 8px;
 }
 
-.shift-label {
+.hud-top-label {
   font-size: 10px;
-  letter-spacing: 3px;
+  letter-spacing: 4px;
   color: #b388ff;
-  text-shadow: 0 0 10px rgba(123, 47, 247, 0.5);
+  text-shadow: 0 0 10px rgba(123, 47, 247, 0.55);
 }
 
-.shift-timer-value {
-  font-size: 18px;
+.timer-seconds {
+  font-size: 28px;
   font-weight: bold;
   letter-spacing: 2px;
   color: #fff;
-  text-shadow: 0 0 12px rgba(255, 255, 255, 0.25);
+  text-shadow: 0 0 16px rgba(255, 255, 255, 0.35);
   font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.timer-suffix {
+  font-size: 14px;
+  color: #888;
+  font-weight: bold;
+}
+
+.hud-guest-stats {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: #aaa;
+}
+
+.hud-guest-stats strong {
+  color: #e0e0e0;
+  font-size: 12px;
+}
+
+.guest-div {
+  color: #444;
+}
+
+/* Call Security */
+.hud-security-row {
+  margin-top: 12px;
+  pointer-events: auto;
+}
+
+.btn-security {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: 220px;
+  padding: 10px 12px;
+  border: 2px solid rgba(100, 180, 255, 0.55);
+  border-radius: 6px;
+  background: rgba(15, 35, 55, 0.92);
+  color: #b3e5fc;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  overflow: hidden;
+  transition: filter 0.2s ease, opacity 0.2s ease;
+  box-shadow: 0 0 14px rgba(80, 160, 255, 0.2);
+}
+
+.btn-security:hover:not(:disabled) {
+  border-color: #4fc3f7;
+  box-shadow: 0 0 20px rgba(79, 195, 247, 0.35);
+}
+
+.btn-security:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.btn-security-cd-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0%;
+  background: rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  transition: height 0.08s linear;
+}
+
+.btn-security.on-cooldown {
+  filter: grayscale(0.85);
+}
+
+.btn-security-label {
+  position: relative;
+  z-index: 1;
 }
 
 /* ── Flow screens (main / pause / end) ───────────────────── */

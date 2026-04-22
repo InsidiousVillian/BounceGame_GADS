@@ -29,7 +29,11 @@
     return arr[Math.floor(Math.random() * arr.length)];
   }
 
-  function generateNpcData() {
+  /**
+   * @param {number} [aggressionBonus=0] — added to rolled aggression (e.g. difficulty scaling), capped at 1
+   */
+  function generateNpcData(aggressionBonus) {
+    const bonus = typeof aggressionBonus === 'number' ? aggressionBonus : 0;
     const age = 16 + Math.floor(Math.random() * 35);
     const isMinor = age < 21;
     const isValidID = Math.random() > 0.32;
@@ -37,7 +41,8 @@
     const name = `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`;
     const idNumber = `${Math.floor(100000000 + Math.random() * 900000000)}`;
     const reasonForEntry = pick(REASONS_FOR_ENTRY);
-    const aggressionChance = 0.14 + Math.random() * 0.48;
+    let aggressionChance = 0.14 + Math.random() * 0.48;
+    aggressionChance = Math.min(1, aggressionChance + bonus);
 
     return {
       name,

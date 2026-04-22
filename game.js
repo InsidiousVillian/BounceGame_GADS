@@ -27,6 +27,14 @@ const AGGRO_CHAOS_PER_SEC = 0.1;
 const NPC_MAX_HEALTH = 3;
 const KNOCKOUT_SPEED = 520;
 const SHIFT_LENGTH_SEC = 120;
+const BASE_SPAWN_MS = 6000;
+const SPAWN_MS_STEP = 1000;
+const MIN_SPAWN_MS = 2000;
+const DIFFICULTY_INTERVAL_SEC = 30;
+const AGGRO_BONUS_PER_TIER = 0.1;
+const SECURITY_COOLDOWN_SEC = 15;
+const SECURITY_CHAOS_REDUCE = 25;
+const SECURITY_VIBE_COST = 20;
 
 const GameState = {
   vibe: 50,
@@ -58,11 +66,29 @@ const GameState = {
     updateHUD();
     checkGameOverChaos();
   },
+
+  /** Tactical reduction (e.g. Call Security) — no chaos spike VFX */
+  reduceChaos(amount) {
+    if (amount <= 0) return;
+    this.chaos = this.clamp(this.chaos - amount);
+    updateHUD();
+  },
+
+  spendVibe(amount) {
+    if (amount <= 0) return;
+    this.vibe = this.clamp(this.vibe - amount);
+    updateHUD();
+  },
 };
 
 let npcs = [];
 let shiftTimerRemaining = SHIFT_LENGTH_SEC;
 let guestsProcessed = 0;
+let guestsLetIn = 0;
+let guestsDenied = 0;
+let securityCooldownRemaining = 0;
+let appliedDifficultyTier = -1;
+let currentSpawnIntervalMs = BASE_SPAWN_MS;
 
 const GRUNGE_PALETTE = [
   '#5d6d5a', '#4a5d52', '#5c6b58', '#6b7d6a',
@@ -73,7 +99,11 @@ const GRUNGE_PALETTE = [
 const MAX_NPCS = 14;
 
 const gameHudWrap = document.getElementById('game-hud-wrap');
-const shiftTimerDisplay = document.getElementById('shift-timer-display');
+const timerSecondsDisplay = document.getElementById('timer-seconds-display');
+const guestLetInEl = document.getElementById('guest-let-in');
+const guestDeniedEl = document.getElementById('guest-denied');
+const btnCallSecurity = document.getElementById('btn-call-security');
+const securityCdOverlay = document.getElementById('security-cd-overlay');
 const vibeBar = document.getElementById('vibe-bar');
 const chaosBar = document.getElementById('chaos-bar');
 const hudEl = document.getElementById('hud');
@@ -115,22 +145,78 @@ function clearSpawnInterval() {
   }
 }
 
-function startSpawnInterval() {
+function getShiftElapsedSec() {
+  return Math.max(0, SHIFT_LENGTH_SEC - shiftTimerRemaining);
+}
+
+function getDifficultyTier() {
+  return Math.floor(getShiftElapsedSec() / DIFFICULTY_INTERVAL_SEC);
+}
+
+function getSpawnIntervalForTier(tier) {
+  return Math.max(MIN_SPAWN_MS, BASE_SPAWN_MS - tier * SPAWN_MS_STEP);
+}
+
+function getAggressionBonusForTier(tier) {
+  return tier * AGGRO_BONUS_PER_TIER;
+}
+
+function restartSpawnIntervalWithCurrentTier() {
   clearSpawnInterval();
+  currentSpawnIntervalMs = getSpawnIntervalForTier(appliedDifficultyTier);
   spawnIntervalId = setInterval(() => {
     if (GameState.currentStatus === STATUS.PLAYING) spawnNPC();
-  }, 6000);
+  }, currentSpawnIntervalMs);
 }
 
-function formatShiftTime(sec) {
-  const s = Math.max(0, Math.ceil(sec));
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return `${m}:${String(r).padStart(2, '0')}`;
+function syncDifficultyScaling() {
+  if (GameState.currentStatus !== STATUS.PLAYING) return;
+  const tier = getDifficultyTier();
+  if (tier === appliedDifficultyTier) return;
+  appliedDifficultyTier = tier;
+  restartSpawnIntervalWithCurrentTier();
 }
 
-function updateShiftTimerDisplay() {
-  if (shiftTimerDisplay) shiftTimerDisplay.textContent = formatShiftTime(shiftTimerRemaining);
+function startSpawnInterval() {
+  appliedDifficultyTier = getDifficultyTier();
+  restartSpawnIntervalWithCurrentTier();
+}
+
+function updateTimerAndGuestHud() {
+  if (timerSecondsDisplay) {
+    timerSecondsDisplay.textContent = String(Math.max(0, Math.ceil(shiftTimerRemaining)));
+  }
+  if (guestLetInEl) guestLetInEl.textContent = String(guestsLetIn);
+  if (guestDeniedEl) guestDeniedEl.textContent = String(guestsDenied);
+  updateSecurityButton();
+}
+
+function updateSecurityButton() {
+  if (!btnCallSecurity || !securityCdOverlay) return;
+  const onCd = securityCooldownRemaining > 0;
+  const canAfford = GameState.vibe >= SECURITY_VIBE_COST;
+  const playable = GameState.currentStatus === STATUS.PLAYING && !GameState.isPaused;
+  btnCallSecurity.disabled = !playable || onCd || !canAfford;
+  const pct = onCd ? (securityCooldownRemaining / SECURITY_COOLDOWN_SEC) * 100 : 0;
+  securityCdOverlay.style.height = `${pct}%`;
+  btnCallSecurity.classList.toggle('on-cooldown', onCd);
+}
+
+function callSecurity() {
+  if (!isPlayingSession() || GameState.isPaused) return;
+  if (securityCooldownRemaining > 0) return;
+  if (GameState.vibe < SECURITY_VIBE_COST) return;
+
+  GameState.spendVibe(SECURITY_VIBE_COST);
+  GameState.reduceChaos(SECURITY_CHAOS_REDUCE);
+  securityCooldownRemaining = SECURITY_COOLDOWN_SEC;
+  updateSecurityButton();
+}
+
+function tickSecurityCooldown(dt) {
+  if (securityCooldownRemaining <= 0) return;
+  securityCooldownRemaining = Math.max(0, securityCooldownRemaining - dt);
+  updateSecurityButton();
 }
 
 function showMainMenu() {
@@ -199,6 +285,11 @@ function resetSessionToMenu() {
   GameState.currentStatus = STATUS.MENU;
   shiftTimerRemaining = SHIFT_LENGTH_SEC;
   guestsProcessed = 0;
+  guestsLetIn = 0;
+  guestsDenied = 0;
+  securityCooldownRemaining = 0;
+  appliedDifficultyTier = -1;
+  currentSpawnIntervalMs = BASE_SPAWN_MS;
   lastFrameTime = 0;
 
   inspectionMenu.classList.add('hidden');
@@ -208,7 +299,7 @@ function resetSessionToMenu() {
   showMainMenu();
 
   updateHUD();
-  updateShiftTimerDisplay();
+  updateTimerAndGuestHud();
   repositionStationQueue();
 }
 
@@ -225,12 +316,17 @@ function startShift() {
   GameState.currentStatus = STATUS.PLAYING;
   shiftTimerRemaining = SHIFT_LENGTH_SEC;
   guestsProcessed = 0;
+  guestsLetIn = 0;
+  guestsDenied = 0;
+  securityCooldownRemaining = 0;
+  appliedDifficultyTier = -1;
+  currentSpawnIntervalMs = BASE_SPAWN_MS;
   lastFrameTime = 0;
 
   inspectionMenu.classList.add('hidden');
   showGameHud();
   updateHUD();
-  updateShiftTimerDisplay();
+  updateTimerAndGuestHud();
   repositionStationQueue();
 
   startSpawnInterval();
@@ -266,10 +362,18 @@ function hideInspectionForPause() {
 }
 
 function onKeyDown(e) {
-  if (e.key !== 'Escape') return;
-  if (GameState.currentStatus === STATUS.PLAYING || GameState.currentStatus === STATUS.PAUSED) {
-    e.preventDefault();
-    togglePause();
+  if (e.key === 'Escape') {
+    if (GameState.currentStatus === STATUS.PLAYING || GameState.currentStatus === STATUS.PAUSED) {
+      e.preventDefault();
+      togglePause();
+    }
+    return;
+  }
+  if (e.code === 'Space' || e.key === ' ') {
+    if (GameState.currentStatus === STATUS.PLAYING && !GameState.isPaused) {
+      e.preventDefault();
+      callSecurity();
+    }
   }
 }
 
@@ -599,12 +703,15 @@ function spawnNPC() {
     console.error('NPCSystem.generateNpcData missing. Load NPCSystem.js before game.js.');
     return;
   }
-  npcs.push(new NPC(NPCSystem.generateNpcData()));
+  const tier = getDifficultyTier();
+  const bonus = getAggressionBonusForTier(tier);
+  npcs.push(new NPC(NPCSystem.generateNpcData(bonus)));
 }
 
 function updateHUD() {
   vibeBar.style.width = GameState.vibe + '%';
   chaosBar.style.width = GameState.chaos + '%';
+  updateSecurityButton();
 }
 
 function hideInspection() {
@@ -688,6 +795,8 @@ function onLetIn() {
     GameState.addVibe(npc.vibeContribution);
   }
 
+  guestsLetIn += 1;
+  updateTimerAndGuestHud();
   removeNpc(npc);
   hideInspection();
 }
@@ -703,6 +812,9 @@ function onDeny() {
 
   const chance = npc.aggressionChance != null ? npc.aggressionChance : 0.28;
   const goesAggro = Math.random() < chance;
+
+  guestsDenied += 1;
+  updateTimerAndGuestHud();
 
   inspectionMenu.classList.add('hidden');
   GameState.activeNpc = null;
@@ -750,19 +862,23 @@ function onCanvasClick(e) {
 function runSimulationStep(dt) {
   if (GameState.currentStatus !== STATUS.PLAYING) return;
 
+  tickSecurityCooldown(dt);
+
   if (GameState.chaos >= 100) {
     triggerGameOver();
     return;
   }
 
   shiftTimerRemaining -= dt;
+  syncDifficultyScaling();
+
   if (shiftTimerRemaining <= 0) {
     shiftTimerRemaining = 0;
-    updateShiftTimerDisplay();
+    updateTimerAndGuestHud();
     triggerWin();
     return;
   }
-  updateShiftTimerDisplay();
+  updateTimerAndGuestHud();
 
   tickAggroChaos(dt);
 
@@ -780,7 +896,11 @@ function gameLoop(timestamp) {
   const dt = lastFrameTime ? Math.min((timestamp - lastFrameTime) / 1000, 0.1) : 0;
   lastFrameTime = timestamp;
 
-  runSimulationStep(dt);
+  if (GameState.currentStatus === STATUS.PLAYING) {
+    runSimulationStep(dt);
+  } else if (GameState.currentStatus === STATUS.PAUSED) {
+    tickSecurityCooldown(dt);
+  }
 
   render();
   requestAnimationFrame(gameLoop);
@@ -845,13 +965,15 @@ function init() {
   hideEndScreens();
   showMainMenu();
   updateHUD();
-  updateShiftTimerDisplay();
+  updateTimerAndGuestHud();
 
   btnStartShift.addEventListener('click', startShift);
   btnResume.addEventListener('click', resumeFromPause);
   btnRetryLoss.addEventListener('click', resetSessionToMenu);
   btnRetryWin.addEventListener('click', resetSessionToMenu);
   document.addEventListener('keydown', onKeyDown);
+
+  if (btnCallSecurity) btnCallSecurity.addEventListener('click', callSecurity);
 
   btnLetIn.addEventListener('click', onLetIn);
   btnDeny.addEventListener('click', onDeny);

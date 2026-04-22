@@ -11,13 +11,20 @@
 
   <div id="ui-overlay">
     <div id="game-hud-wrap" class="hidden">
-      <div id="hud">
-        <div class="hud-shift-row">
-          <div class="shift-timer-block">
-            <span class="shift-label">SHIFT</span>
-            <span id="shift-timer-display" class="shift-timer-value">2:00</span>
-          </div>
+      <div id="hud-top-center" class="hud-top-center" aria-live="polite">
+        <div class="hud-timer-block-center">
+          <span class="hud-top-label">TIMER</span>
+          <span id="timer-seconds-display" class="timer-seconds">120</span>
+          <span class="timer-suffix">s</span>
         </div>
+        <div class="hud-guest-stats">
+          <span class="guest-stat">LET IN: <strong id="guest-let-in">0</strong></span>
+          <span class="guest-div" aria-hidden="true">|</span>
+          <span class="guest-stat">DENIED: <strong id="guest-denied">0</strong></span>
+        </div>
+      </div>
+
+      <div id="hud">
         <div class="bar-group">
           <label>VIBE</label>
           <div class="bar-track"><div id="vibe-bar" class="bar vibe"></div></div>
@@ -25,6 +32,12 @@
         <div class="bar-group chaos-bar-group" id="chaos-bar-wrap">
           <label>CHAOS</label>
           <div class="bar-track"><div id="chaos-bar" class="bar chaos"></div></div>
+        </div>
+        <div class="hud-security-row">
+          <button type="button" id="btn-call-security" class="btn-security" title="Costs 20 Vibe, reduces Chaos by 25. 15s cooldown.">
+            <span class="btn-security-cd-overlay" id="security-cd-overlay" aria-hidden="true"></span>
+            <span class="btn-security-label">CALL SECURITY [Space]</span>
+          </button>
         </div>
       </div>
     </div>
