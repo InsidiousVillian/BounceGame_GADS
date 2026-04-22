@@ -108,37 +108,45 @@
     </div>
 
     <div id="game-over-screen" class="flow-screen hidden" role="dialog" aria-modal="true" aria-labelledby="gameover-title">
-      <div class="flow-panel flow-panel--loss">
+      <div class="flow-panel flow-panel--loss" id="game-over-panel">
+        <p id="loss-new-high-badge" class="new-high-score-badge hidden" aria-live="polite">NEW HIGH SCORE!</p>
         <h2 id="gameover-title" class="flow-title flow-title--loss">GAME OVER</h2>
         <p class="flow-message">THE CLUB WAS SHUT DOWN. TOO MUCH CHAOS.</p>
         <p class="flow-score">Guests processed: <strong id="game-over-guests">0</strong></p>
-        <div class="shift-report" aria-label="Shift report">
+        <div class="shift-report shift-report--detailed" aria-label="Shift report">
           <h3 class="shift-report-title">Shift report</h3>
-          <table class="shift-report-table">
-            <tr><th scope="row">Total earnings</th><td id="report-earnings-loss">$0</td></tr>
-            <tr><th scope="row">Fines</th><td id="report-fines-loss">$0</td></tr>
-            <tr><th scope="row">Net</th><td id="report-net-loss">$0</td></tr>
-            <tr class="shift-report-grade-row"><th scope="row">Final grade</th><td id="report-grade-loss" class="shift-grade">—</td></tr>
-          </table>
+          <ul class="shift-report-list">
+            <li><span class="shift-stat-label">Guests let in</span><span class="shift-stat-value" id="report-let-in-loss">0</span></li>
+            <li><span class="shift-stat-label">Mistakes made</span><span class="shift-stat-value" id="report-mistakes-loss">0</span></li>
+            <li class="shift-report-list-grade"><span class="shift-stat-label">Final grade</span><span class="shift-grade" id="report-grade-loss">F</span></li>
+          </ul>
+          <div class="shift-report-money">
+            <p class="shift-money-line">Earnings <span id="report-earnings-loss">$0</span> · Fines <span id="report-fines-loss">$0</span> · Net <span id="report-net-loss">$0</span></p>
+          </div>
         </div>
+        <p class="all-time-high-footer">All-time best: <strong id="loss-all-time-guests">0</strong> guests · Grade <strong id="loss-all-time-grade">—</strong></p>
         <button type="button" class="btn-flow btn-flow-primary" id="btn-retry-loss">RETRY</button>
       </div>
     </div>
 
     <div id="win-screen" class="flow-screen hidden" role="dialog" aria-modal="true" aria-labelledby="win-title">
-      <div class="flow-panel flow-panel--win">
+      <div class="flow-panel flow-panel--win" id="win-panel">
+        <p id="win-new-high-badge" class="new-high-score-badge hidden" aria-live="polite">NEW HIGH SCORE!</p>
         <h2 id="win-title" class="flow-title flow-title--win">SHIFT COMPLETE</h2>
         <p class="flow-message">You survived the night. The rope holds.</p>
         <p class="flow-score">Guests processed: <strong id="win-guests">0</strong></p>
-        <div class="shift-report" aria-label="Shift report">
+        <div class="shift-report shift-report--detailed" aria-label="Shift report">
           <h3 class="shift-report-title">Shift report</h3>
-          <table class="shift-report-table">
-            <tr><th scope="row">Total earnings</th><td id="report-earnings-win">$0</td></tr>
-            <tr><th scope="row">Fines</th><td id="report-fines-win">$0</td></tr>
-            <tr><th scope="row">Net</th><td id="report-net-win">$0</td></tr>
-            <tr class="shift-report-grade-row"><th scope="row">Final grade</th><td id="report-grade-win" class="shift-grade">—</td></tr>
-          </table>
+          <ul class="shift-report-list">
+            <li><span class="shift-stat-label">Guests let in</span><span class="shift-stat-value" id="report-let-in-win">0</span></li>
+            <li><span class="shift-stat-label">Mistakes made</span><span class="shift-stat-value" id="report-mistakes-win">0</span></li>
+            <li class="shift-report-list-grade"><span class="shift-stat-label">Final grade</span><span class="shift-grade" id="report-grade-win">—</span></li>
+          </ul>
+          <div class="shift-report-money">
+            <p class="shift-money-line">Earnings <span id="report-earnings-win">$0</span> · Fines <span id="report-fines-win">$0</span> · Net <span id="report-net-win">$0</span></p>
+          </div>
         </div>
+        <p class="all-time-high-footer">All-time best: <strong id="win-all-time-guests">0</strong> guests · Grade <strong id="win-all-time-grade">—</strong></p>
         <button type="button" class="btn-flow btn-flow-primary" id="btn-retry-win">RETRY</button>
       </div>
     </div>
@@ -147,6 +155,10 @@
       <div class="flow-panel flow-panel--main">
         <h1 id="main-title" class="main-title">THE VELVET ROPE</h1>
         <p class="main-tagline">Bouncer shift simulator</p>
+        <div class="main-high-score" aria-label="All-time high score">
+          <p class="main-high-score-title">All-time high score</p>
+          <p class="main-high-score-body"><span id="menu-high-guests">0</span> guests processed · Best grade <strong id="menu-high-grade" class="menu-grade">—</strong></p>
+        </div>
         <button type="button" class="btn-flow btn-flow-start" id="btn-start-shift">START SHIFT</button>
         <p class="main-hint"><kbd>ESC</kbd> pauses during a shift</p>
       </div>

@@ -238,6 +238,21 @@ OGG club track + dynamic lowpass routing: COMPLETE
 
 ---
 
+## Session 15 - 2026-04-22
+
+### Prompt
+**High score** + **shift report**: track **guests let in**, **correct denials**, **mistakes** (bad let-in or legit deny); **`calculateGrade()`** (**S**–**F**, chaos → **F**); **`localStorage`** best guests + best grade; UI on **main menu** / **win** / **loss**; **New High Score** flair; update logs.
+
+### Tasks Completed
+- **`game.js`:** **`shiftMistakes`** (**`onLetIn`** if fake/minor, **`onDeny`** if legit); **`shiftCorrectDenials`** on proper deny; **`calculateGrade({ chaosLoss, mistakes, guestsLetIn, guestsProcessed })`** — **S** if **0** mistakes, **`guestsLetIn` ≥ 10**, **`guestsProcessed` ≥ 8**; **A** if **0** mistakes quieter shift; **B/C/D** by **`mistakes / guestsProcessed`** bands (**≤0.1**, **≤0.22**, else **D**); **`loadHighScores` / `persistHighScoresIfBeat` / `updateMainMenuHighScore`**; **`populateEndScreenReport`** fills new DOM ids + money summary + **`refreshEndScreenAllTime`**.
+- **`index.html` / `style.css`:** Detailed **shift-report** list; **all-time** footers; **main-high-score** block; **`.new-high-score-badge`**, **`@keyframes new-high-pulse`**, **`flow-panel--new-record`**; **`.shift-grade--d`**.
+- **Docs:** **`TO_DO.md`** — **High Score & Shift Report** **[x]**; Session 15; project summary.
+
+### Status
+Persistent high score + mistake-based grading + end-screen flair: COMPLETE
+
+---
+
 ## Project summary — The Velvet Rope (bouncer shift simulator)
 
-Vanilla **HTML5 Canvas** + **DOM** UI: **NPCSystem** generates guests (IDs, minors, aggro); queue at **bouncer station**; **PVC ID card** inspection (drag, seal, shape portraits); **Let In / Deny** drives **Vibe** & **Chaos**; deny can turn **aggressive** with **punch** combat and **particles**; **Call Security** tactical cooldown; **difficulty** scales every **30s**; **AssetManager** sprite placeholders (**background**, **NPC**, **POW**); **SoundManager** — procedural **SFX** (punch, stamps, chaos alarm) plus **DavidKBD *Portal to Underworld*** loop routed through a **lowpass** (muffled when **paused**, full on shift + end screens); **flow** menu / pause / win / loss with **shift report**; **vignette**, **scanlines**, and **vibe-synced** door glow for polish.
+Vanilla **HTML5 Canvas** + **DOM** UI: **NPCSystem** generates guests (IDs, minors, aggro); queue at **bouncer station**; **PVC ID card** inspection (drag, seal, shape portraits); **Let In / Deny** drives **Vibe** & **Chaos**; deny can turn **aggressive** with **punch** combat and **particles**; **Call Security** tactical cooldown; **difficulty** scales every **30s**; **AssetManager** sprite placeholders (**background**, **NPC**, **POW**); **SoundManager** — procedural **SFX** (punch, stamps, chaos alarm) plus **DavidKBD *Portal to Underworld*** loop routed through a **lowpass** (muffled when **paused**, full on shift + end screens); **flow** menu / pause / win / loss with **shift report**, **mistake-based grades**, and **localStorage** high scores (**most guests processed** + **best letter grade**); **vignette**, **scanlines**, and **vibe-synced** door glow for polish.

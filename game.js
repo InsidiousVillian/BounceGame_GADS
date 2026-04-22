@@ -37,6 +37,11 @@ const SECURITY_CHAOS_REDUCE = 25;
 const SECURITY_VIBE_COST = 20;
 const SHIFT_EARN_PER_LEGIT_LET_IN = 10;
 const SHIFT_FINE_MINOR_LET_IN = 50;
+const LS_HIGH_GUESTS = 'velvetRope_mostGuestsProcessed';
+const LS_BEST_GRADE = 'velvetRope_bestGrade';
+/** S tier: flawless + busy shift */
+const GRADE_S_MIN_LET_IN = 10;
+const GRADE_S_MIN_HANDLED = 8;
 
 const GameState = {
   vibe: 50,
@@ -90,6 +95,8 @@ let guestsLetIn = 0;
 let guestsDenied = 0;
 let shiftLegitLetInCount = 0;
 let shiftMinorLetInCount = 0;
+let shiftCorrectDenials = 0;
+let shiftMistakes = 0;
 let stationPulsePhase = 0;
 let securityCooldownRemaining = 0;
 let appliedDifficultyTier = -1;
@@ -252,13 +259,70 @@ function computeShiftEconomics() {
   return { earnings, fines, net };
 }
 
-function shiftGradeLetter(net, chaosShutdown, wonShift) {
-  if (chaosShutdown || !wonShift) return 'F';
-  if (net >= 350) return 'S';
-  if (net >= 220) return 'A';
-  if (net >= 120) return 'B';
-  if (net >= 0) return 'C';
-  return 'F';
+function gradeRank(letter) {
+  const r = { S: 6, A: 5, B: 4, C: 3, D: 2, F: 1 };
+  return r[letter] ?? 0;
+}
+
+/**
+ * F if chaos shutdown. S = 0 mistakes & strong guest volume. A–D from mistake ratio vs guests processed.
+ */
+function calculateGrade({ chaosLoss, mistakes, guestsLetIn, guestsProcessed }) {
+  if (chaosLoss) return 'F';
+  const denom = Math.max(1, guestsProcessed);
+  const ratio = mistakes / denom;
+  if (mistakes === 0 && guestsLetIn >= GRADE_S_MIN_LET_IN && guestsProcessed >= GRADE_S_MIN_HANDLED) return 'S';
+  if (mistakes === 0) return 'A';
+  if (ratio <= 0.1) return 'B';
+  if (ratio <= 0.22) return 'C';
+  return 'D';
+}
+
+function loadHighScores() {
+  try {
+    const raw = parseInt(localStorage.getItem(LS_HIGH_GUESTS) || '0', 10);
+    const guests = Number.isFinite(raw) ? Math.max(0, raw) : 0;
+    let grade = (localStorage.getItem(LS_BEST_GRADE) || 'F').toUpperCase().trim();
+    const valid = new Set(['S', 'A', 'B', 'C', 'D', 'F']);
+    if (!valid.has(grade)) grade = 'F';
+    return { guests, grade };
+  } catch (_) {
+    return { guests: 0, grade: 'F' };
+  }
+}
+
+function persistHighScoresIfBeat(guestsCount, grade) {
+  try {
+    const prev = loadHighScores();
+    const beatGuests = guestsCount > prev.guests;
+    const beatGrade = gradeRank(grade) > gradeRank(prev.grade);
+    if (beatGuests) localStorage.setItem(LS_HIGH_GUESTS, String(guestsCount));
+    if (beatGrade) localStorage.setItem(LS_BEST_GRADE, grade);
+    return beatGuests || beatGrade;
+  } catch (_) {
+    return false;
+  }
+}
+
+function updateMainMenuHighScore() {
+  const { guests, grade } = loadHighScores();
+  const mg = document.getElementById('menu-high-guests');
+  const mgr = document.getElementById('menu-high-grade');
+  if (mg) mg.textContent = String(guests);
+  if (mgr) {
+    mgr.textContent = grade;
+    setShiftGradeClass(mgr, grade);
+  }
+}
+
+function refreshEndScreenAllTime(screenKey) {
+  const { guests, grade } = loadHighScores();
+  const gid = screenKey === 'win' ? 'win-all-time-guests' : 'loss-all-time-guests';
+  const rid = screenKey === 'win' ? 'win-all-time-grade' : 'loss-all-time-grade';
+  const gEl = document.getElementById(gid);
+  const rEl = document.getElementById(rid);
+  if (gEl) gEl.textContent = String(guests);
+  if (rEl) rEl.textContent = grade;
 }
 
 function formatShiftMoney(n) {
@@ -268,27 +332,53 @@ function formatShiftMoney(n) {
 
 function setShiftGradeClass(el, grade) {
   if (!el) return;
-  el.classList.remove('shift-grade--s', 'shift-grade--a', 'shift-grade--b', 'shift-grade--c', 'shift-grade--f');
-  el.classList.add(`shift-grade--${grade.toLowerCase()}`);
+  const g = (grade || 'F').toUpperCase();
+  el.classList.remove('shift-grade--s', 'shift-grade--a', 'shift-grade--b', 'shift-grade--c', 'shift-grade--d', 'shift-grade--f');
+  el.classList.add(`shift-grade--${g.toLowerCase()}`);
 }
 
-function populateEndScreenReport(screenKey, wonShift, chaosShutdown) {
+function populateEndScreenReport(screenKey, chaosShutdown) {
+  const grade = calculateGrade({
+    chaosLoss: chaosShutdown,
+    mistakes: shiftMistakes,
+    guestsLetIn,
+    guestsProcessed,
+  });
+
+  const letInEl = document.getElementById(`report-let-in-${screenKey}`);
+  const mistEl = document.getElementById(`report-mistakes-${screenKey}`);
+  const gg = document.getElementById(`report-grade-${screenKey}`);
+  if (letInEl) letInEl.textContent = String(guestsLetIn);
+  if (mistEl) mistEl.textContent = String(shiftMistakes);
+  if (gg) {
+    gg.textContent = grade;
+    setShiftGradeClass(gg, grade);
+  }
+
   const { earnings, fines, net } = computeShiftEconomics();
-  const grade = shiftGradeLetter(net, chaosShutdown, wonShift);
   const ge = document.getElementById(`report-earnings-${screenKey}`);
   const gf = document.getElementById(`report-fines-${screenKey}`);
   const gn = document.getElementById(`report-net-${screenKey}`);
-  const gg = document.getElementById(`report-grade-${screenKey}`);
   if (ge) ge.textContent = formatShiftMoney(earnings);
   if (gf) gf.textContent = fines > 0 ? `-$${Math.round(fines)}` : '$0';
   if (gn) {
     gn.textContent = formatShiftMoney(net);
     gn.style.color = net >= 0 ? '#b9f6ca' : '#ff8a80';
   }
-  if (gg) {
-    gg.textContent = grade;
-    setShiftGradeClass(gg, grade);
+
+  const newRecord = persistHighScoresIfBeat(guestsProcessed, grade);
+  const panelId = screenKey === 'win' ? 'win-panel' : 'game-over-panel';
+  const badgeId = screenKey === 'win' ? 'win-new-high-badge' : 'loss-new-high-badge';
+  const panel = document.getElementById(panelId);
+  const badge = document.getElementById(badgeId);
+  if (panel) {
+    panel.classList.remove('flow-panel--new-record');
+    if (newRecord) panel.classList.add('flow-panel--new-record');
   }
+  if (badge) badge.classList.toggle('hidden', !newRecord);
+
+  refreshEndScreenAllTime(screenKey);
+  updateMainMenuHighScore();
 }
 
 function updateTimerAndGuestHud() {
@@ -372,7 +462,7 @@ function triggerGameOver() {
   stopShiftAlarmOnly();
   if (typeof SoundManager !== 'undefined' && SoundManager.setMusicMuffled) SoundManager.setMusicMuffled(false);
   gameOverGuestsEl.textContent = String(guestsProcessed);
-  populateEndScreenReport('loss', false, true);
+  populateEndScreenReport('loss', true);
   gameOverScreen.classList.remove('hidden');
 }
 
@@ -386,7 +476,7 @@ function triggerWin() {
   stopShiftAlarmOnly();
   if (typeof SoundManager !== 'undefined' && SoundManager.setMusicMuffled) SoundManager.setMusicMuffled(false);
   winGuestsEl.textContent = String(guestsProcessed);
-  populateEndScreenReport('win', true, false);
+  populateEndScreenReport('win', false);
   winScreen.classList.remove('hidden');
 }
 
@@ -404,6 +494,8 @@ function resetSessionToMenu() {
   guestsDenied = 0;
   shiftLegitLetInCount = 0;
   shiftMinorLetInCount = 0;
+  shiftCorrectDenials = 0;
+  shiftMistakes = 0;
   stationPulsePhase = 0;
   securityCooldownRemaining = 0;
   appliedDifficultyTier = -1;
@@ -423,6 +515,7 @@ function resetSessionToMenu() {
   updateHUD();
   updateTimerAndGuestHud();
   repositionStationQueue();
+  updateMainMenuHighScore();
 }
 
 function startShift() {
@@ -442,6 +535,8 @@ function startShift() {
   guestsDenied = 0;
   shiftLegitLetInCount = 0;
   shiftMinorLetInCount = 0;
+  shiftCorrectDenials = 0;
+  shiftMistakes = 0;
   stationPulsePhase = 0;
   securityCooldownRemaining = 0;
   appliedDifficultyTier = -1;
@@ -1172,6 +1267,7 @@ function onLetIn() {
 
   if (!badLetIn) shiftLegitLetInCount += 1;
   else if (npc.isMinor) shiftMinorLetInCount += 1;
+  if (badLetIn) shiftMistakes += 1;
 
   if (typeof SoundManager !== 'undefined' && SoundManager.play) SoundManager.play('sfx_stamp_approve');
 
@@ -1190,6 +1286,9 @@ function onDeny() {
 
   if (isLegitGuest(npc)) {
     GameState.addChaos(5);
+    shiftMistakes += 1;
+  } else {
+    shiftCorrectDenials += 1;
   }
 
   const chance = npc.aggressionChance != null ? npc.aggressionChance : 0.28;
@@ -1398,6 +1497,7 @@ function init() {
   showMainMenu();
   updateHUD();
   updateTimerAndGuestHud();
+  updateMainMenuHighScore();
 
   btnStartShift.addEventListener('click', startShift);
   btnResume.addEventListener('click', resumeFromPause);
