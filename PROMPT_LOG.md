@@ -174,3 +174,19 @@ Redesign inspection from text list to a **visual ID card**: PVC-style layout wit
 
 ### Status
 Visual ID card + portraits + seal variants + draggable UI: COMPLETE
+
+---
+
+## Session 11 - 2026-04-22
+
+### Prompt
+**Asset loading** before play: placeholders **`background_club`**, **`npc_base`**, **`effect_punch`**; refactor **`NPC.draw`** to **sprites** with **flip** by movement / hit; **world** render with **background first**; **punch particles** + **white hit flash** on damage; update **TO_DO.md** / **PROMPT_LOG.md**.
+
+### Tasks Completed
+- **`AssetManager.js`:** **`load(onComplete, onProgress?)`** rasterizes three placeholder canvases to **`Image`** (fallback: raw canvas on decode error); **`get(key)`**; keys **`background_club`** (club entrance / arch / neon), **`npc_base`** (silhouette), **`effect_punch`** (starburst + **POW**).
+- **`index.html`:** Script order **`AssetManager.js`** → **`NPCSystem.js`** → **`game.js`**.
+- **`game.js`:** **`init`** calls **`AssetManager.load`** then starts the RAF loop; **`drawBackgroundClub()`** (cover + darken) + **`drawWorldOverlay()`** (grid + floor rect); **`NPC.draw`** uses **`ctx.drawImage`** with **`scale(-1,1)`** when **`_facingLeft`** (queue approach, knockout velocity, aggro toward door, **0.14s** **`_hitFacingTimer`** after punch to preserve flip); **CSS filters** for aggro/knockout tint; **screen / brightness** pass for **`_punchFlash`**; vector fallback if asset missing; **`PunchParticle`** + **`effect_punch`** sparks; **`tickCombatFx`** in **`gameLoop`** when playing or paused; clear FX on **shift / menu reset**.
+- **Docs:** **`TO_DO.md`** — **Art Asset Integration System** **[x]**; Session 11 note; this entry.
+
+### Status
+Sprite pipeline + preload + punch VFX: COMPLETE

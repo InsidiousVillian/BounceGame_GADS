@@ -98,6 +98,9 @@ const GRUNGE_PALETTE = [
 
 const MAX_NPCS = 14;
 
+const punchParticles = [];
+const punchSparks = [];
+
 const gameHudWrap = document.getElementById('game-hud-wrap');
 const timerSecondsDisplay = document.getElementById('timer-seconds-display');
 const guestLetInEl = document.getElementById('guest-let-in');
@@ -135,6 +138,16 @@ let spawnIntervalId = null;
 let lastFrameTime = 0;
 
 const inspectMenuDrag = { active: false, offsetX: 0, offsetY: 0 };
+
+function getAssetImage(key) {
+  if (typeof AssetManager === 'undefined' || !AssetManager.get) return null;
+  const img = AssetManager.get(key);
+  if (!img) return null;
+  if (typeof HTMLCanvasElement !== 'undefined' && img instanceof HTMLCanvasElement) return img;
+  if (typeof HTMLImageElement !== 'undefined' && img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0)
+    return img;
+  return null;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Flow & session
@@ -300,6 +313,8 @@ function resetSessionToMenu() {
 
   inspectionMenu.classList.add('hidden');
   resetInspectionMenuLayout();
+  punchParticles.length = 0;
+  punchSparks.length = 0;
   hidePauseMenu();
   hideEndScreens();
   hideGameHud();
@@ -332,6 +347,8 @@ function startShift() {
 
   inspectionMenu.classList.add('hidden');
   resetInspectionMenuLayout();
+  punchParticles.length = 0;
+  punchSparks.length = 0;
   showGameHud();
   updateHUD();
   updateTimerAndGuestHud();
@@ -613,6 +630,83 @@ function getBubbleLabel(npc) {
   return npc.bubbleChar;
 }
 
+class PunchParticle {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    const a = Math.random() * Math.PI * 2;
+    const sp = 90 + Math.random() * 140;
+    this.vx = Math.cos(a) * sp;
+    this.vy = Math.sin(a) * sp - 40;
+    this.maxLife = 0.28 + Math.random() * 0.18;
+    this.life = this.maxLife;
+    this.size = 2 + Math.random() * 2.5;
+    this.color = Math.random() < 0.55 ? '#fffde7' : '#ffe082';
+  }
+
+  update(dt) {
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    this.vy += 420 * dt;
+    this.vx *= 0.97;
+    this.life -= dt;
+  }
+
+  draw(ctx) {
+    const a = Math.max(0, this.life / this.maxLife);
+    ctx.fillStyle = this.color;
+    ctx.globalAlpha = a;
+    ctx.fillRect(this.x - this.size * 0.5, this.y - this.size * 0.5, this.size, this.size);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function spawnPunchParticles(x, y, count = 6) {
+  const n = Math.max(1, count | 0);
+  for (let i = 0; i < n; i++) punchParticles.push(new PunchParticle(x, y));
+}
+
+function spawnPunchSpark(x, y) {
+  punchSparks.push({
+    x,
+    y,
+    life: 0.2,
+    maxLife: 0.2,
+    rot: Math.random() * Math.PI * 2,
+  });
+}
+
+function tickCombatFx(dt) {
+  for (let i = punchParticles.length - 1; i >= 0; i--) {
+    punchParticles[i].update(dt);
+    if (punchParticles[i].life <= 0) punchParticles.splice(i, 1);
+  }
+  for (let i = punchSparks.length - 1; i >= 0; i--) {
+    punchSparks[i].life -= dt;
+    if (punchSparks[i].life <= 0) punchSparks.splice(i, 1);
+  }
+}
+
+function drawCombatFx(ctx) {
+  const powImg = getAssetImage('effect_punch');
+  if (powImg) {
+    for (const s of punchSparks) {
+      const t = Math.max(0, s.life / s.maxLife);
+      const scale = 0.75 + (1 - t) * 0.65;
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.rotate(s.rot + (1 - t) * 0.8);
+      ctx.globalAlpha = Math.min(1, t * 3);
+      const w = powImg.width * scale;
+      const h = powImg.height * scale;
+      ctx.drawImage(powImg, -w * 0.5, -h * 0.5, w, h);
+      ctx.restore();
+    }
+  }
+  ctx.globalAlpha = 1;
+  for (const p of punchParticles) p.draw(ctx);
+}
+
 function drawSpeechBubble(ctx, npc, anchorX, anchorY) {
   const ax = anchorX != null ? anchorX : npc.x;
   const ay = anchorY != null ? anchorY : npc.y;
@@ -675,12 +769,15 @@ class NPC {
     this._punchFlash = 0;
     this._koVx = 0;
     this._koVy = 0;
+    this._facingLeft = false;
+    this._hitFacingTimer = 0;
   }
 
   update(dt) {
     if (this.state === STATE_KNOCKOUT) {
       this.x += this._koVx * dt;
       this.y += this._koVy * dt;
+      this._facingLeft = this._koVx < 0;
       const margin = 80;
       if (
         this.x < -margin ||
@@ -697,6 +794,12 @@ class NPC {
       this._pulse += dt * 5;
       this._shakePhase += dt * 28;
       if (this._punchFlash > 0) this._punchFlash = Math.max(0, this._punchFlash - dt);
+      if (this._hitFacingTimer > 0) {
+        this._hitFacingTimer -= dt;
+      } else {
+        const b = getStationBounds();
+        this._facingLeft = this.x > b.cx;
+      }
       return;
     }
 
@@ -725,6 +828,7 @@ class NPC {
     if (dist > 0.5) {
       this.x += (dx / dist) * this.speed;
       this.y += (dy / dist) * this.speed;
+      this._facingLeft = this.x > stopX;
     }
   }
 
@@ -739,25 +843,58 @@ class NPC {
     const px = this.x + ox;
     const py = this.y + oy;
 
-    let fill = this.color;
-    if (this.state === STATE_AGGRESSIVE) {
-      const l = 38 + Math.sin(this._pulse) * 14;
-      fill = `hsl(0, 82%, ${l}%)`;
-    } else if (this.state === STATE_KNOCKOUT) {
-      fill = `hsl(0, 55%, ${42 + Math.sin(this._pulse * 2) * 8}%)`;
-    }
+    const img = getAssetImage('npc_base');
+    const drawW = this.size * 2.15;
+    const drawH = this.size * 2.85;
+    const hx = drawW * 0.5;
+    const hy = drawH * 0.5;
 
-    ctx.fillStyle = fill;
-    ctx.fillRect(px - this.half, py - this.half, this.size, this.size);
+    if (img) {
+      ctx.save();
+      ctx.translate(px, py);
+      if (this._facingLeft) ctx.scale(-1, 1);
 
-    if (this._punchFlash > 0) {
-      ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(0.92, this._punchFlash * 4)})`;
+      let filter = 'none';
+      if (this.state === STATE_AGGRESSIVE) {
+        const l = 38 + Math.sin(this._pulse) * 14;
+        filter = `sepia(0.35) saturate(1.8) hue-rotate(-12deg) brightness(${0.45 + l / 140})`;
+      } else if (this.state === STATE_KNOCKOUT) {
+        const l = 42 + Math.sin(this._pulse * 2) * 8;
+        filter = `sepia(0.5) saturate(1.5) hue-rotate(-18deg) brightness(${0.4 + l / 120})`;
+      }
+      ctx.filter = filter;
+      ctx.drawImage(img, -hx, -hy, drawW, drawH);
+      ctx.filter = 'none';
+
+      if (this._punchFlash > 0) {
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = Math.min(0.95, this._punchFlash * 4.2);
+        ctx.filter = 'brightness(2.4)';
+        ctx.drawImage(img, -hx, -hy, drawW, drawH);
+        ctx.filter = 'none';
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+      }
+
+      ctx.restore();
+    } else {
+      let fill = this.color;
+      if (this.state === STATE_AGGRESSIVE) {
+        const l = 38 + Math.sin(this._pulse) * 14;
+        fill = `hsl(0, 82%, ${l}%)`;
+      } else if (this.state === STATE_KNOCKOUT) {
+        fill = `hsl(0, 55%, ${42 + Math.sin(this._pulse * 2) * 8}%)`;
+      }
+      ctx.fillStyle = fill;
       ctx.fillRect(px - this.half, py - this.half, this.size, this.size);
+      if (this._punchFlash > 0) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(0.92, this._punchFlash * 4)})`;
+        ctx.fillRect(px - this.half, py - this.half, this.size, this.size);
+      }
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px - this.half + 0.5, py - this.half + 0.5, this.size - 1, this.size - 1);
     }
-
-    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(px - this.half + 0.5, py - this.half + 0.5, this.size - 1, this.size - 1);
 
     if (this.state === STATE_AT_STATION || this.state === STATE_INSPECTING) {
       ctx.strokeStyle = 'rgba(224, 64, 251, 0.9)';
@@ -781,15 +918,18 @@ class NPC {
     ctx.fillStyle = '#e8e8e8';
     ctx.font = '9px "Courier New", monospace';
     ctx.textAlign = 'center';
-    const nameLift = atReady || this.state === STATE_AGGRESSIVE ? 40 : 6;
+    const usingSprite = !!getAssetImage('npc_base');
+    const spriteLift = usingSprite ? this.size * 2.85 * 0.5 + 10 : this.half;
+    const nameLift =
+      atReady || this.state === STATE_AGGRESSIVE ? spriteLift + 18 : usingSprite ? spriteLift + 4 : 6;
     if (this.state !== STATE_KNOCKOUT) {
-      ctx.fillText(this.name.split(' ')[0], px, py - this.half - nameLift);
+      ctx.fillText(this.name.split(' ')[0], px, py - nameLift);
     }
 
     if (this.state === STATE_AT_STATION && GameState.activeNpc !== this) {
       ctx.fillStyle = '#e1bee7';
       ctx.font = 'bold 12px "Courier New", monospace';
-      ctx.fillText('E', px, py - this.half - 22);
+      ctx.fillText('E', px, py - spriteLift - 8);
     }
   }
 
@@ -890,8 +1030,12 @@ function punchAggressiveNpc(npc) {
   if (!isPlayingSession()) return;
   if (npc.state !== STATE_AGGRESSIVE) return;
   playCombatSound();
+  npc._facingLeft = !npc._facingLeft;
+  npc._hitFacingTimer = 0.14;
   npc._punchFlash = 0.22;
   triggerPunchScreenshake();
+  spawnPunchParticles(npc.x, npc.y, 7);
+  spawnPunchSpark(npc.x, npc.y - npc.half * 0.35);
   npc.health -= 1;
   if (npc.health <= 0) {
     const b = getStationBounds();
@@ -949,6 +1093,11 @@ function onDeny() {
     npc._pulse = 0;
     npc._shakePhase = 0;
     npc._punchFlash = 0;
+    npc._hitFacingTimer = 0;
+    {
+      const b = getStationBounds();
+      npc._facingLeft = npc.x > b.cx;
+    }
     repositionStationQueue();
     return;
   }
@@ -1024,23 +1173,47 @@ function gameLoop(timestamp) {
     tickSecurityCooldown(dt);
   }
 
+  if (GameState.currentStatus === STATUS.PLAYING || GameState.currentStatus === STATUS.PAUSED) {
+    tickCombatFx(dt);
+  }
+
   render();
   requestAnimationFrame(gameLoop);
 }
 
-function drawGameArea() {
+function drawBackgroundClub() {
+  const w = canvas.width;
+  const h = canvas.height;
+  const { cx, cy } = getStationBounds();
+  const img = getAssetImage('background_club');
+
+  if (img) {
+    const iw = img.width;
+    const ih = img.height;
+    const scale = Math.max(w / iw, h / ih);
+    const dw = iw * scale;
+    const dh = ih * scale;
+    const ox = (w - dw) * 0.5;
+    const oy = (h - dh) * 0.5;
+    ctx.drawImage(img, ox, oy, dw, dh);
+    ctx.fillStyle = 'rgba(6, 4, 12, 0.4)';
+    ctx.fillRect(0, 0, w, h);
+  } else {
+    const g = ctx.createRadialGradient(cx, cy, 20, cx, cy, Math.max(w, h) * 0.55);
+    g.addColorStop(0, '#222232');
+    g.addColorStop(0.45, '#181824');
+    g.addColorStop(1, '#0e0e14');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  }
+}
+
+function drawWorldOverlay() {
   const w = canvas.width;
   const h = canvas.height;
   const { cx, cy } = getStationBounds();
 
-  const g = ctx.createRadialGradient(cx, cy, 20, cx, cy, Math.max(w, h) * 0.55);
-  g.addColorStop(0, '#222232');
-  g.addColorStop(0.45, '#181824');
-  g.addColorStop(1, '#0e0e14');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, w, h);
-
-  ctx.strokeStyle = 'rgba(123, 47, 247, 0.12)';
+  ctx.strokeStyle = 'rgba(123, 47, 247, 0.1)';
   ctx.lineWidth = 1;
   const step = 48;
   for (let x = 0; x < w; x += step) {
@@ -1056,7 +1229,7 @@ function drawGameArea() {
     ctx.stroke();
   }
 
-  ctx.strokeStyle = 'rgba(123, 47, 247, 0.2)';
+  ctx.strokeStyle = 'rgba(123, 47, 247, 0.18)';
   ctx.lineWidth = 2;
   ctx.setLineDash([10, 14]);
   ctx.strokeRect(cx - 200, cy - 140, 400, 280);
@@ -1065,7 +1238,8 @@ function drawGameArea() {
 
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawGameArea();
+  drawBackgroundClub();
+  drawWorldOverlay();
 
   const { cx, cy } = getStationBounds();
   ctx.fillStyle = 'rgba(123, 47, 247, 0.08)';
@@ -1074,6 +1248,7 @@ function render() {
   ctx.fill();
 
   for (const npc of npcs) npc.draw(ctx);
+  drawCombatFx(ctx);
 }
 
 function init() {
@@ -1103,7 +1278,11 @@ function init() {
   btnDeny.addEventListener('click', onDeny);
   canvas.addEventListener('click', onCanvasClick);
 
-  requestAnimationFrame(gameLoop);
+  if (typeof AssetManager !== 'undefined' && typeof AssetManager.load === 'function') {
+    AssetManager.load(() => requestAnimationFrame(gameLoop));
+  } else {
+    requestAnimationFrame(gameLoop);
+  }
 }
 
 init();
