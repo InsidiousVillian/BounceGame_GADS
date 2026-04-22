@@ -21,12 +21,30 @@
       </div>
     </div>
 
-    <div id="id-menu" class="hidden">
-      <h2>ID Check</h2>
-      <div id="id-content"></div>
-      <div class="id-actions">
-        <button id="btn-allow">Allow In</button>
-        <button id="btn-deny">Turn Away</button>
+    <div id="bouncer-station" aria-label="Bouncer station door">
+      <span class="station-label">Bouncer Station</span>
+    </div>
+
+    <div id="inspection-menu" class="hidden" role="dialog" aria-modal="true" aria-labelledby="inspection-title">
+      <div class="inspection-folder">
+        <div class="folder-tab" id="inspection-title">ID / ENTRY</div>
+        <div class="folder-body">
+          <div class="folder-clip"></div>
+          <div class="inspection-fields">
+            <div class="field-block">
+              <span class="field-label">Name</span>
+              <p class="field-value" id="inspect-name">—</p>
+            </div>
+            <div class="field-block">
+              <span class="field-label">Age</span>
+              <p class="field-value" id="inspect-age">—</p>
+            </div>
+          </div>
+          <div class="inspection-actions">
+            <button type="button" class="btn-neon btn-let-in" id="btn-let-in">Let In</button>
+            <button type="button" class="btn-neon btn-deny" id="btn-deny">Deny</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
