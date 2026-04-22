@@ -45,6 +45,11 @@ const LS_BEST_GRADE = 'velvetRope_bestGrade';
 /** S tier: flawless + busy shift */
 const GRADE_S_MIN_LET_IN = 10;
 const GRADE_S_MIN_HANDLED = 8;
+const DAILY_RULE_STANDARD_SEC = 60;
+const RULE_STANDARD = 'standard';
+const RULE_NO_MINORS = 'no_minors';
+const RULE_NO_SECTOR_7 = 'no_sector_7';
+const RULE_VIOLATION_CHAOS = 20;
 const NPC_WALK_FRAME_MS = 200;
 const SCREEN_SHAKE_DECAY = 0.82;
 const SCREEN_SHAKE_MAX = 14;
@@ -103,6 +108,12 @@ let shiftLegitLetInCount = 0;
 let shiftMinorLetInCount = 0;
 let shiftCorrectDenials = 0;
 let shiftMistakes = 0;
+let shiftVipSuccessCount = 0;
+let dailyRuleTransitionDone = false;
+/** @type {'no_minors'|'no_sector_7'} active after first 60s */
+let dailyRuleSpecialMode = RULE_NO_MINORS;
+/** @type {ReturnType<typeof setTimeout>|null} */
+let ruleToastHideId = null;
 let stationPulsePhase = 0;
 let securityCooldownRemaining = 0;
 let appliedDifficultyTier = -1;
@@ -233,6 +244,76 @@ function clearSpawnInterval() {
 
 function getShiftElapsedSec() {
   return Math.max(0, SHIFT_LENGTH_SEC - shiftTimerRemaining);
+}
+
+function getDailyRuleMode() {
+  if (getShiftElapsedSec() < DAILY_RULE_STANDARD_SEC) return RULE_STANDARD;
+  return dailyRuleSpecialMode;
+}
+
+function resetDailyRuleState() {
+  dailyRuleTransitionDone = false;
+  dailyRuleSpecialMode = RULE_NO_MINORS;
+  if (ruleToastHideId != null) {
+    clearTimeout(ruleToastHideId);
+    ruleToastHideId = null;
+  }
+  const toast = document.getElementById('rule-change-toast');
+  if (toast) {
+    toast.classList.remove('rule-change-toast--visible');
+    toast.textContent = '';
+  }
+  updateDailyRuleHud();
+}
+
+function updateDailyRuleHud() {
+  const el = document.getElementById('hud-daily-rule-text');
+  if (!el) return;
+  const mode = getDailyRuleMode();
+  if (mode === RULE_STANDARD) {
+    el.textContent = 'Standard Entry — valid adults only; watch for fakes & minors';
+  } else if (mode === RULE_NO_MINORS) {
+    el.textContent = '21+ ONLY — no minors on the list tonight';
+  } else {
+    el.textContent = 'No IDs from SECTOR 7 — deny even if the card looks clean';
+  }
+}
+
+function tickDailyRuleTransition() {
+  if (GameState.currentStatus !== STATUS.PLAYING) return;
+  if (dailyRuleTransitionDone) return;
+  if (getShiftElapsedSec() < DAILY_RULE_STANDARD_SEC) return;
+  dailyRuleTransitionDone = true;
+  dailyRuleSpecialMode = Math.random() < 0.5 ? RULE_NO_MINORS : RULE_NO_SECTOR_7;
+  updateDailyRuleHud();
+  showRuleChangeToast();
+}
+
+function showRuleChangeToast() {
+  const el = document.getElementById('rule-change-toast');
+  if (!el) return;
+  const msg =
+    dailyRuleSpecialMode === RULE_NO_MINORS
+      ? 'NEW RULE: NO MINORS ALLOWED (21+ ONLY)'
+      : 'NEW RULE: NO IDs FROM SECTOR 7';
+  el.textContent = msg;
+  el.classList.add('rule-change-toast--visible');
+  if (ruleToastHideId != null) clearTimeout(ruleToastHideId);
+  ruleToastHideId = setTimeout(() => {
+    el.classList.remove('rule-change-toast--visible');
+    ruleToastHideId = null;
+  }, 4500);
+}
+
+/**
+ * Letting this guest in violates the active (post-60s) house rule.
+ */
+function letInViolatesDailyRule(npc) {
+  const mode = getDailyRuleMode();
+  if (mode === RULE_STANDARD) return false;
+  if (mode === RULE_NO_MINORS && npc.isMinor) return true;
+  if (mode === RULE_NO_SECTOR_7 && npc.idSector === 7) return true;
+  return false;
 }
 
 function getDifficultyTier() {
@@ -400,9 +481,11 @@ function populateEndScreenReport(screenKey, chaosShutdown) {
 
   const letInEl = document.getElementById(`report-let-in-${screenKey}`);
   const mistEl = document.getElementById(`report-mistakes-${screenKey}`);
+  const vipRep = document.getElementById(`report-vip-${screenKey}`);
   const gg = document.getElementById(`report-grade-${screenKey}`);
   if (letInEl) letInEl.textContent = String(guestsLetIn);
   if (mistEl) mistEl.textContent = String(shiftMistakes);
+  if (vipRep) vipRep.textContent = String(shiftVipSuccessCount);
   if (gg) {
     gg.textContent = grade;
     setShiftGradeClass(gg, grade);
@@ -549,6 +632,8 @@ function resetSessionToMenu() {
   shiftMinorLetInCount = 0;
   shiftCorrectDenials = 0;
   shiftMistakes = 0;
+  shiftVipSuccessCount = 0;
+  resetDailyRuleState();
   stationPulsePhase = 0;
   securityCooldownRemaining = 0;
   appliedDifficultyTier = -1;
@@ -593,6 +678,8 @@ function startShift() {
   shiftMinorLetInCount = 0;
   shiftCorrectDenials = 0;
   shiftMistakes = 0;
+  shiftVipSuccessCount = 0;
+  resetDailyRuleState();
   stationPulsePhase = 0;
   securityCooldownRemaining = 0;
   appliedDifficultyTier = -1;
@@ -682,9 +769,14 @@ function isLegitGuest(npc) {
 }
 
 function formatValidityLine(npc) {
-  if (!npc.isValidID) return { text: 'FORGED — FAKE ID', cls: 'field-value field-value--fake' };
-  if (npc.isMinor) return { text: 'VALID ID — MINOR (UNDER 21)', cls: 'field-value field-value--legit field-value--minor-warn' };
-  return { text: 'VERIFIED — LEGIT', cls: 'field-value field-value--legit' };
+  let base;
+  if (!npc.isValidID) base = { text: 'FORGED — FAKE ID', cls: 'field-value field-value--fake' };
+  else if (npc.isMinor) base = { text: 'VALID ID — MINOR (UNDER 21)', cls: 'field-value field-value--legit field-value--minor-warn' };
+  else base = { text: 'VERIFIED — LEGIT', cls: 'field-value field-value--legit' };
+  if (npc.isVip) {
+    return { text: `${base.text} · VIP LISTING`, cls: `${base.cls} field-value--vip-tag` };
+  }
+  return base;
 }
 
 function sealSvgValid() {
@@ -1278,6 +1370,23 @@ class NPC {
       ctx.strokeRect(px - this.half - 2, py - this.half - 2, this.size + 4, this.size + 4);
     }
 
+    if (this.isVip && this.state !== STATE_KNOCKOUT) {
+      const rw = usingSprite ? drawW : this.size;
+      const rh = usingSprite ? drawH : this.size;
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.strokeStyle = 'rgba(255, 215, 130, 0.95)';
+      ctx.lineWidth = 2.2;
+      ctx.shadowColor = 'rgba(255, 195, 80, 0.9)';
+      ctx.shadowBlur = 16;
+      ctx.strokeRect(-rw / 2 - 4, -rh / 2 - 4, rw + 8, rh + 8);
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(255, 245, 200, 0.5)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(-rw / 2 - 7, -rh / 2 - 7, rw + 14, rh + 14);
+      ctx.restore();
+    }
+
     const atReady = this.state === STATE_AT_STATION || this.state === STATE_INSPECTING;
     if (this.state === STATE_AGGRESSIVE) {
       drawSpeechBubble(ctx, this, px, py);
@@ -1321,7 +1430,12 @@ function spawnNPC() {
   }
   const tier = getDifficultyTier();
   const bonus = getAggressionBonusForTier(tier);
-  npcs.push(new NPC(NPCSystem.generateNpcData(bonus)));
+  const npc = new NPC(NPCSystem.generateNpcData(bonus));
+  npcs.push(npc);
+  if (npc.isVip && typeof SoundManager !== 'undefined') {
+    if (SoundManager.playVipChime) SoundManager.playVipChime();
+    else if (SoundManager.play) SoundManager.play('sfx_vip_chime');
+  }
 }
 
 function updateHUD() {
@@ -1348,6 +1462,23 @@ function showInspection(npc) {
   GameState.activeNpc = npc;
   npc.state = STATE_INSPECTING;
   GameState.isPaused = true;
+
+  const idCardEl = document.getElementById('inspect-id-card');
+  if (idCardEl) idCardEl.classList.toggle('id-card--vip', !!npc.isVip);
+
+  const vipRibbon = document.getElementById('inspect-vip-ribbon');
+  if (vipRibbon) vipRibbon.classList.toggle('hidden', !npc.isVip);
+
+  const vipAnnexWrap = document.getElementById('inspect-vip-annex-wrap');
+  const vipAnnex = document.getElementById('inspect-vip-annex');
+  if (vipAnnexWrap && vipAnnex) {
+    const showAnnex = !!(npc.isVip && npc.vipAnnexLine);
+    vipAnnexWrap.classList.toggle('hidden', !showAnnex);
+    vipAnnex.textContent = showAnnex ? npc.vipAnnexLine : '—';
+  }
+
+  const sectorEl = document.getElementById('inspect-sector');
+  if (sectorEl) sectorEl.textContent = npc.idSector != null ? String(npc.idSector) : '—';
 
   if (inspectPortraitHost) {
     inspectPortraitHost.innerHTML = npc.portraitSvg || '';
@@ -1424,16 +1555,31 @@ function onLetIn() {
   const npc = GameState.activeNpc;
   if (!npc) return;
 
-  const badLetIn = !npc.isValidID || npc.isMinor;
-  if (badLetIn) {
+  const isDocBad = !npc.isValidID || npc.isMinor;
+  const ruleBlocked = letInViolatesDailyRule(npc);
+
+  if (isDocBad) {
     GameState.addChaos(15);
-  } else {
-    GameState.addVibe(npc.vibeContribution);
+  }
+  if (ruleBlocked) {
+    GameState.addChaos(RULE_VIOLATION_CHAOS);
+    triggerScreenShake(8);
   }
 
-  if (!badLetIn) shiftLegitLetInCount += 1;
+  const successfulLetIn = !isDocBad && !ruleBlocked;
+  if (successfulLetIn) {
+    let vibeAmt = npc.vibeContribution * (npc.isVip ? 2 : 1);
+    GameState.addVibe(vibeAmt);
+    if (npc.isVip) GameState.reduceChaos(5);
+  }
+
+  if (successfulLetIn) shiftLegitLetInCount += 1;
   else if (npc.isMinor) shiftMinorLetInCount += 1;
-  if (badLetIn) shiftMistakes += 1;
+
+  if (isDocBad) shiftMistakes += 1;
+  else if (ruleBlocked) shiftMistakes += 1;
+
+  if (successfulLetIn && npc.isVip) shiftVipSuccessCount += 1;
 
   if (typeof SoundManager !== 'undefined' && SoundManager.play) SoundManager.play('sfx_stamp_approve');
 
@@ -1524,6 +1670,7 @@ function runSimulationStep(dt) {
 
   shiftTimerRemaining -= dt;
   syncDifficultyScaling();
+  tickDailyRuleTransition();
 
   if (shiftTimerRemaining <= 0) {
     shiftTimerRemaining = 0;
@@ -1674,6 +1821,7 @@ function init() {
   updateHUD();
   updateTimerAndGuestHud();
   updateMainMenuHighScore();
+  updateDailyRuleHud();
 
   btnStartShift.addEventListener('click', startShift);
   btnResume.addEventListener('click', resumeFromPause);

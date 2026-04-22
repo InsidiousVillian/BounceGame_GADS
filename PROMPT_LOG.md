@@ -269,6 +269,23 @@ Layered club scene + walk cycle + shake/dust juice: COMPLETE
 
 ---
 
+## Session 17 - 2026-04-22
+
+### Prompt
+**VIP system** (**10%**, visuals, **2× vibe** + **−5 chaos** on good let-in, complex ID); **timed house rules** (sticky **60s** then **21+ only** or **no Sector 7**); **+20 chaos** on rule break; **synthetic VIP chime**; shift report **VIP** count; docs.
+
+### Tasks Completed
+- **`NPCSystem.js`:** **`isVip`** (**`Math.random() < 0.1`**), **`idSector`** (1–12), long **`idNumber`** + **`vipAnnexLine`** for VIPs.
+- **`game.js`:** **`getDailyRuleMode`**, **`tickDailyRuleTransition`**, **`letInViolatesDailyRule`**, **`onLetIn`** refactored (**`isDocBad` / `ruleBlocked` / `successfulLetIn`**); **`shiftVipSuccessCount`**; **`spawnNPC`** VIP chime; HUD **`updateDailyRuleHud`** + toast; **`showInspection`** sector / VIP UI; end report **`report-vip-*`**.
+- **`SoundManager.js`:** **`playVipChime`** (stacked sines + shimmer), **`play('sfx_vip_chime')`**.
+- **`index.html` / `style.css`:** Sticky **`#hud-daily-rule`**, **`#rule-change-toast`**, VIP ribbon + **`id-card--vip`**, **`inspect-sector`**, annex block.
+- **Docs:** **`TO_DO.md`** — **VIPs & Special Rules** **[x]**; Session 17; project summary.
+
+### Status
+VIP rewards + rotating entry law + rule violation chaos: COMPLETE
+
+---
+
 ## Project summary — The Velvet Rope (bouncer shift simulator)
 
-Vanilla **HTML5 Canvas** + **DOM** UI: **NPCSystem** generates guests (IDs, minors, aggro); queue at **bouncer station**; **PVC ID card** inspection (drag, seal, shape portraits); **Let In / Deny** drives **Vibe** & **Chaos**; deny can turn **aggressive** with **punch** combat and **particles**; **Call Security** tactical cooldown; **difficulty** scales every **30s**; **AssetManager** — **club entrance** + **foreground** (ropes / podium) + **two-frame NPC walk** + **POW**; **game stage** layers (**CSS** back / **canvas** characters & FX / **CSS** fore); **screen shake** on punch and large **chaos** spikes; **dust** puffs when guests halt at the rope; **SoundManager** — procedural **SFX** (punch, stamps, chaos alarm) plus **DavidKBD *Portal to Underworld*** loop routed through a **lowpass** (muffled when **paused**, full on shift + end screens); **flow** menu / pause / win / loss with **shift report**, **mistake-based grades**, and **localStorage** high scores (**most guests processed** + **best letter grade**); **vignette**, **scanlines**, and **vibe-synced** door glow for polish.
+Vanilla **HTML5 Canvas** + **DOM** UI: **NPCSystem** generates guests (IDs, minors, **sectors**, **VIP** 10%, aggro); queue at **bouncer station**; **PVC ID card** inspection (drag, seal, shape portraits, **VIP** ribbon / aux line); **Let In / Deny** drives **Vibe** & **Chaos**; **VIP** clean let-in = **double vibe** + **chaos** tick down; **after 60s** a **house rule** flips (**21+ only** or **no Sector 7**) with HUD sticky + toast — violating on **Let In** adds **+20 chaos**; deny can turn **aggressive** with **punch** combat and **particles**; **Call Security** tactical cooldown; **difficulty** scales every **30s**; **AssetManager** — **club entrance** + **foreground** (ropes / podium) + **two-frame NPC walk** + **POW**; **game stage** layers (**CSS** back / **canvas** characters & FX / **CSS** fore); **screen shake** on punch and large **chaos** spikes; **dust** puffs when guests halt at the rope; **SoundManager** — procedural **SFX** (punch, stamps, chaos alarm, **VIP chime**) plus **DavidKBD *Portal to Underworld*** loop routed through a **lowpass** (muffled when **paused**, full on shift + end screens); **flow** menu / pause / win / loss with **shift report** (incl. **VIPs OK**), **mistake-based grades**, and **localStorage** high scores (**most guests processed** + **best letter grade**); **vignette**, **scanlines**, and **vibe-synced** door glow for polish.

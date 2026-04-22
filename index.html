@@ -33,6 +33,12 @@
           <span class="guest-div" aria-hidden="true">|</span>
           <span class="guest-stat">DENIED: <strong id="guest-denied">0</strong></span>
         </div>
+        <div id="hud-daily-rule" class="hud-daily-rule" role="note" aria-label="Tonight's entry rule">
+          <span class="hud-daily-rule-pin" aria-hidden="true"></span>
+          <p class="hud-daily-rule-title">Tonight only</p>
+          <p id="hud-daily-rule-text" class="hud-daily-rule-text">Standard Entry — first 60s</p>
+        </div>
+        <p id="rule-change-toast" class="rule-change-toast" aria-live="assertive"></p>
       </div>
 
       <div id="hud">
@@ -54,10 +60,11 @@
     </div>
 
     <div id="inspection-menu" class="hidden" role="dialog" aria-modal="true" aria-labelledby="inspection-title">
-      <div class="id-card">
+      <div class="id-card" id="inspect-id-card">
         <div class="id-card-drag-handle" id="id-card-drag-handle" title="Drag to move">
           <span class="id-card-drag-grip" aria-hidden="true"></span>
           <span class="id-card-drag-title" id="inspection-title">STATE ISSUED IDENTIFICATION</span>
+          <span id="inspect-vip-ribbon" class="inspect-vip-ribbon hidden" aria-hidden="true">VIP</span>
         </div>
         <div class="id-card-body">
           <div class="id-card-portrait-column">
@@ -75,6 +82,14 @@
               <div class="field-block field-block--compact">
                 <span class="field-label id-card-label">Document No.</span>
                 <p class="field-value field-value--official" id="inspect-id-number">—</p>
+              </div>
+              <div class="field-block field-block--compact">
+                <span class="field-label id-card-label">Issuing sector</span>
+                <p class="field-value field-value--official" id="inspect-sector">—</p>
+              </div>
+              <div id="inspect-vip-annex-wrap" class="field-block field-block--compact hidden">
+                <span class="field-label id-card-label">Auxiliary line</span>
+                <p class="field-value field-value--multiline field-value--vip-annex" id="inspect-vip-annex">—</p>
               </div>
               <div class="field-block field-block--compact">
                 <span class="field-label id-card-label">Full name</span>
@@ -121,6 +136,7 @@
           <ul class="shift-report-list">
             <li><span class="shift-stat-label">Guests let in</span><span class="shift-stat-value" id="report-let-in-loss">0</span></li>
             <li><span class="shift-stat-label">Mistakes made</span><span class="shift-stat-value" id="report-mistakes-loss">0</span></li>
+            <li><span class="shift-stat-label">VIPs processed OK</span><span class="shift-stat-value shift-stat-value--vip" id="report-vip-loss">0</span></li>
             <li class="shift-report-list-grade"><span class="shift-stat-label">Final grade</span><span class="shift-grade" id="report-grade-loss">F</span></li>
           </ul>
           <div class="shift-report-money">
@@ -143,6 +159,7 @@
           <ul class="shift-report-list">
             <li><span class="shift-stat-label">Guests let in</span><span class="shift-stat-value" id="report-let-in-win">0</span></li>
             <li><span class="shift-stat-label">Mistakes made</span><span class="shift-stat-value" id="report-mistakes-win">0</span></li>
+            <li><span class="shift-stat-label">VIPs processed OK</span><span class="shift-stat-value shift-stat-value--vip" id="report-vip-win">0</span></li>
             <li class="shift-report-list-grade"><span class="shift-stat-label">Final grade</span><span class="shift-grade" id="report-grade-win">—</span></li>
           </ul>
           <div class="shift-report-money">

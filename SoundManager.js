@@ -216,10 +216,52 @@
       this.stopMusic();
     },
 
+    /** Short synthetic sparkle / chime when a VIP spawns in queue */
+    playVipChime() {
+      const ctx = getCtx();
+      if (!ctx) return;
+      const t = ctx.currentTime + 0.001;
+      const freqs = [880, 1174.66, 1567.98];
+      freqs.forEach((f, i) => {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, t + i * 0.045);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0, t + i * 0.045);
+        g.gain.linearRampToValueAtTime(0.065 - i * 0.012, t + i * 0.045 + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.045 + 0.28);
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'peaking';
+        bp.frequency.value = f;
+        bp.Q.value = 0.9;
+        bp.gain.value = 4;
+        osc.connect(bp);
+        bp.connect(g);
+        g.connect(ctx.destination);
+        const st = t + i * 0.045;
+        osc.start(st);
+        osc.stop(st + 0.32);
+      });
+
+      const sh = ctx.createOscillator();
+      sh.type = 'triangle';
+      sh.frequency.setValueAtTime(2400, t);
+      sh.frequency.exponentialRampToValueAtTime(5200, t + 0.08);
+      const gSh = ctx.createGain();
+      gSh.gain.setValueAtTime(0, t);
+      gSh.gain.linearRampToValueAtTime(0.04, t + 0.006);
+      gSh.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+      sh.connect(gSh);
+      gSh.connect(ctx.destination);
+      sh.start(t);
+      sh.stop(t + 0.16);
+    },
+
     play(key) {
       if (key === 'sfx_punch') this.playPunch();
       else if (key === 'sfx_stamp_approve') this.playStamp(false);
       else if (key === 'sfx_stamp_deny') this.playStamp(true);
+      else if (key === 'sfx_vip_chime') this.playVipChime();
     },
 
     updateChaosAlarm(chaos) {

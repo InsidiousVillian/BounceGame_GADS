@@ -117,9 +117,15 @@
     const age = 16 + Math.floor(Math.random() * 35);
     const isMinor = age < 21;
     const isValidID = Math.random() > 0.32;
+    const isVip = Math.random() < 0.1;
+    const idSector = 1 + Math.floor(Math.random() * 12);
     const vibeContribution = Math.round(4 + Math.random() * 18);
     const name = `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`;
-    const idNumber = `${Math.floor(100000000 + Math.random() * 900000000)}`;
+    const suffix = pick(['K', 'M', 'Q', 'R', 'T']);
+    const mid = Math.floor(1000000 + Math.random() * 8999999);
+    const idNumber = isVip
+      ? `VL-${String(idSector).padStart(2, '0')}-${mid}-${suffix}-2 / ALT-${Math.floor(100 + Math.random() * 899)}`
+      : `${Math.floor(100000000 + Math.random() * 900000000)}`;
     const reasonForEntry = pick(REASONS_FOR_ENTRY);
     let aggressionChance = 0.14 + Math.random() * 0.48;
     aggressionChance = Math.min(1, aggressionChance + bonus);
@@ -132,14 +138,21 @@
       securitySealVariant = Math.random() < 0.5 ? 'missing' : 'broken';
     }
 
+    const vipAnnexLine = isVip
+      ? `AUX VERIFY: checksum digit ↔ sector prefix · secondary emboss ${pick(['Δ', 'Λ', 'Σ'])}-${Math.floor(10 + Math.random() * 89)}`
+      : '';
+
     return {
       name,
       age,
       isValidID,
       isMinor,
+      isVip,
+      idSector,
       reasonForEntry,
       vibeContribution,
       idNumber,
+      vipAnnexLine,
       aggressionChance,
       portraitSvg,
       securitySealVariant,
