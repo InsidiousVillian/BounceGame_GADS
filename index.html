@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bouncer</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+
+  <div id="ui-overlay">
+    <div id="hud">
+      <div class="bar-group">
+        <label>VIBE</label>
+        <div class="bar-track"><div id="vibe-bar" class="bar vibe"></div></div>
+      </div>
+      <div class="bar-group">
+        <label>CHAOS</label>
+        <div class="bar-track"><div id="chaos-bar" class="bar chaos"></div></div>
+      </div>
+    </div>
+
+    <div id="id-menu" class="hidden">
+      <h2>ID Check</h2>
+      <div id="id-content"></div>
+      <div class="id-actions">
+        <button id="btn-allow">Allow In</button>
+        <button id="btn-deny">Turn Away</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
