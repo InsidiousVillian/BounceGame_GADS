@@ -253,6 +253,22 @@ Persistent high score + mistake-based grading + end-screen flair: COMPLETE
 
 ---
 
+## Session 16 - 2026-04-22
+
+### Prompt
+**Animated sprites** + **layered environment**: NPC **sprite sheet / frame** support, **2-frame walk** (**200ms**) while moving, **bobbing** square fallback; **stage** layers (**club entrance** back, **canvas** mid, **bouncer + velvet rope** fore); **screen shake** on punch + **chaos +10** spike; **dust** at station stop; docs.
+
+### Tasks Completed
+- **`AssetManager.js`:** **`background_club_entrance`** (club arch), **`foreground_club`** (podium + stanchions + rope curves), **`npc_walk_a` / `npc_walk_b`** (lean variants from **`drawNpcBaseFrame`**); jobs expanded.
+- **`index.html` / `style.css`:** **`#game-stage`** wraps **`#stage-background`**, **`#gameCanvas`**, **`#bouncer-station`**, **`#stage-foreground`**; cover **background-image** layers; canvas **`pointer-events: auto`**.
+- **`game.js`:** **`syncStageLayerImages`**, **`drawCanvasBackdropFallback`**; **`getNpcBodyDrawable`** + optional **`spriteFrameKeys`**; walk timing + **`spawnStationDust`** on **`STATE_MOVING` → `STATE_AT_STATION`**; **`StationDustParticle`**; **`triggerScreenShake`** + **`tickScreenShake`** on **`#game-stage`**; chaos **`notifyChaosIncrease`** adds shake for **≥10** / light shake **≥5**; render order: NPCs → dust → combat.
+- **Docs:** **`TO_DO.md`** — **Animated Sprites & Environment** **[x]**; Session 16; project summary.
+
+### Status
+Layered club scene + walk cycle + shake/dust juice: COMPLETE
+
+---
+
 ## Project summary — The Velvet Rope (bouncer shift simulator)
 
-Vanilla **HTML5 Canvas** + **DOM** UI: **NPCSystem** generates guests (IDs, minors, aggro); queue at **bouncer station**; **PVC ID card** inspection (drag, seal, shape portraits); **Let In / Deny** drives **Vibe** & **Chaos**; deny can turn **aggressive** with **punch** combat and **particles**; **Call Security** tactical cooldown; **difficulty** scales every **30s**; **AssetManager** sprite placeholders (**background**, **NPC**, **POW**); **SoundManager** — procedural **SFX** (punch, stamps, chaos alarm) plus **DavidKBD *Portal to Underworld*** loop routed through a **lowpass** (muffled when **paused**, full on shift + end screens); **flow** menu / pause / win / loss with **shift report**, **mistake-based grades**, and **localStorage** high scores (**most guests processed** + **best letter grade**); **vignette**, **scanlines**, and **vibe-synced** door glow for polish.
+Vanilla **HTML5 Canvas** + **DOM** UI: **NPCSystem** generates guests (IDs, minors, aggro); queue at **bouncer station**; **PVC ID card** inspection (drag, seal, shape portraits); **Let In / Deny** drives **Vibe** & **Chaos**; deny can turn **aggressive** with **punch** combat and **particles**; **Call Security** tactical cooldown; **difficulty** scales every **30s**; **AssetManager** — **club entrance** + **foreground** (ropes / podium) + **two-frame NPC walk** + **POW**; **game stage** layers (**CSS** back / **canvas** characters & FX / **CSS** fore); **screen shake** on punch and large **chaos** spikes; **dust** puffs when guests halt at the rope; **SoundManager** — procedural **SFX** (punch, stamps, chaos alarm) plus **DavidKBD *Portal to Underworld*** loop routed through a **lowpass** (muffled when **paused**, full on shift + end screens); **flow** menu / pause / win / loss with **shift report**, **mistake-based grades**, and **localStorage** high scores (**most guests processed** + **best letter grade**); **vignette**, **scanlines**, and **vibe-synced** door glow for polish.

@@ -1,6 +1,7 @@
 /**
  * Preloads drawable assets. Placeholders are rasterized from canvas for now;
  * swap draw functions or add URL loading when real art is ready.
+ * Keys: background_club_entrance, foreground_club, npc_base, npc_walk_a/b, effect_punch.
  */
 (function (global) {
   const BG_W = 960;
@@ -68,11 +69,16 @@
     x.fillRect(BG_W * 0.5 - 2, archTop + 30, 4, archBot - archTop - 30);
   }
 
-  function drawNpcBase(c) {
+  /** @param {number} frame 0 or 1 — slight lean for walk cycle */
+  function drawNpcBaseFrame(c, frame) {
     c.width = NPC_W;
     c.height = NPC_H;
     const x = c.getContext('2d');
     x.clearRect(0, 0, NPC_W, NPC_H);
+
+    const lean = frame === 1 ? 2.2 : -1.1;
+    const squash = frame === 1 ? 0.96 : 1.02;
+    const cx = NPC_W / 2 + lean;
 
     const body = x.createLinearGradient(0, 0, NPC_W, NPC_H);
     body.addColorStop(0, '#2a2438');
@@ -80,26 +86,103 @@
     body.addColorStop(1, '#0e0c14');
     x.fillStyle = body;
 
+    x.save();
+    x.translate(cx, 22);
+    x.scale(squash, 1);
+    x.translate(-cx, -22);
+
     x.beginPath();
-    x.ellipse(NPC_W / 2, 22, 14, 16, 0, 0, Math.PI * 2);
+    x.ellipse(cx, 22, 14, 16, 0, 0, Math.PI * 2);
     x.fill();
 
     x.beginPath();
-    x.moveTo(NPC_W / 2 - 18, 38);
-    x.lineTo(NPC_W / 2 + 18, 38);
-    x.lineTo(NPC_W / 2 + 22, 72);
-    x.lineTo(NPC_W / 2 - 22, 72);
+    x.moveTo(cx - 18, 38);
+    x.lineTo(cx + 18, 38);
+    x.lineTo(cx + 22, 72);
+    x.lineTo(cx - 22, 72);
     x.closePath();
     x.fill();
 
-    x.fillRect(NPC_W / 2 - 8, 72, 16, 16);
-    x.fillRect(NPC_W / 2 - 22, 48, 10, 36);
-    x.fillRect(NPC_W / 2 + 12, 48, 10, 36);
+    x.fillRect(cx - 8, 72, 16, 16);
+    x.fillRect(cx - 22, 48, 10, 36);
+    x.fillRect(cx + 12, 48, 10, 36);
 
     x.fillStyle = 'rgba(0, 0, 0, 0.35)';
     x.beginPath();
-    x.ellipse(NPC_W / 2 - 4, 20, 5, 6, 0, 0, Math.PI * 2);
+    x.ellipse(cx - 4, 20, 5, 6, 0, 0, Math.PI * 2);
     x.fill();
+    x.restore();
+  }
+
+  function drawNpcBase(c) {
+    drawNpcBaseFrame(c, 0);
+  }
+
+  function drawForegroundClub(c) {
+    c.width = BG_W;
+    c.height = BG_H;
+    const x = c.getContext('2d');
+    x.clearRect(0, 0, BG_W, BG_H);
+
+    x.fillStyle = 'rgba(0, 0, 0, 0)';
+    x.fillRect(0, 0, BG_W, BG_H);
+
+    const floorY = BG_H * 0.78;
+    const podiumW = BG_W * 0.34;
+    const podiumH = BG_H * 0.22;
+    const podiumX = (BG_W - podiumW) / 2;
+
+    const gradPod = x.createLinearGradient(0, floorY - podiumH, 0, BG_H);
+    gradPod.addColorStop(0, 'rgba(18, 14, 28, 0.92)');
+    gradPod.addColorStop(0.55, 'rgba(12, 10, 20, 0.88)');
+    gradPod.addColorStop(1, 'rgba(6, 5, 12, 0.95)');
+    x.fillStyle = gradPod;
+    x.beginPath();
+    x.moveTo(podiumX + 20, floorY);
+    x.lineTo(podiumX + podiumW - 20, floorY);
+    x.lineTo(podiumX + podiumW, floorY + podiumH);
+    x.lineTo(podiumX, floorY + podiumH);
+    x.closePath();
+    x.fill();
+
+    x.strokeStyle = 'rgba(123, 47, 247, 0.35)';
+    x.lineWidth = 2;
+    x.stroke();
+
+    const ropeY = floorY - 8;
+    x.strokeStyle = 'rgba(224, 64, 251, 0.55)';
+    x.lineWidth = 4;
+    x.lineCap = 'round';
+    for (let side = -1; side <= 1; side += 2) {
+      const sx = BG_W / 2 + side * (podiumW * 0.42);
+      x.beginPath();
+      x.moveTo(sx, ropeY - 50);
+      x.quadraticCurveTo(sx + side * 80, ropeY - 10, BG_W / 2 + side * 18, ropeY + 6);
+      x.stroke();
+    }
+    x.strokeStyle = 'rgba(255, 200, 120, 0.4)';
+    x.lineWidth = 2.5;
+    for (let side = -1; side <= 1; side += 2) {
+      const sx = BG_W / 2 + side * (podiumW * 0.42);
+      x.beginPath();
+      x.moveTo(sx, ropeY - 48);
+      x.quadraticCurveTo(sx + side * 76, ropeY - 8, BG_W / 2 + side * 16, ropeY + 4);
+      x.stroke();
+    }
+
+    x.fillStyle = 'rgba(30, 22, 40, 0.75)';
+    for (let side = -1; side <= 1; side += 2) {
+      const px = BG_W / 2 + side * (podiumW * 0.52 + 24);
+      x.fillRect(px - 6, ropeY - 4, 12, 38);
+      x.fillStyle = 'rgba(224, 64, 251, 0.25)';
+      x.beginPath();
+      x.arc(px, ropeY - 4, 8, 0, Math.PI * 2);
+      x.fill();
+      x.fillStyle = 'rgba(30, 22, 40, 0.75)';
+    }
+
+    x.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    x.fillRect(0, floorY + podiumH - 6, BG_W, BG_H - floorY - podiumH + 6);
   }
 
   function drawEffectPunch(c) {
@@ -157,8 +240,11 @@
      */
     load(onComplete, onProgress) {
       const jobs = [
-        ['background_club', drawBackgroundClub],
+        ['background_club_entrance', drawBackgroundClub],
+        ['foreground_club', drawForegroundClub],
         ['npc_base', drawNpcBase],
+        ['npc_walk_a', (cv) => drawNpcBaseFrame(cv, 0)],
+        ['npc_walk_b', (cv) => drawNpcBaseFrame(cv, 1)],
         ['effect_punch', drawEffectPunch],
       ];
       let finished = 0;

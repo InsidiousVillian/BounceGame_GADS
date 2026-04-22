@@ -4,6 +4,9 @@
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const gameStage = document.getElementById('game-stage');
+const stageBackgroundEl = document.getElementById('stage-background');
+const stageForegroundEl = document.getElementById('stage-foreground');
 
 const STATION_W = 160;
 const STATION_H = 160;
@@ -42,6 +45,9 @@ const LS_BEST_GRADE = 'velvetRope_bestGrade';
 /** S tier: flawless + busy shift */
 const GRADE_S_MIN_LET_IN = 10;
 const GRADE_S_MIN_HANDLED = 8;
+const NPC_WALK_FRAME_MS = 200;
+const SCREEN_SHAKE_DECAY = 0.82;
+const SCREEN_SHAKE_MAX = 14;
 
 const GameState = {
   vibe: 50,
@@ -112,6 +118,9 @@ const MAX_NPCS = 14;
 
 const punchParticles = [];
 const punchSparks = [];
+const stationDustParticles = [];
+
+let screenShakeMagnitude = 0;
 
 const gameHudWrap = document.getElementById('game-hud-wrap');
 const timerSecondsDisplay = document.getElementById('timer-seconds-display');
@@ -161,6 +170,50 @@ function getAssetImage(key) {
   if (typeof HTMLImageElement !== 'undefined' && img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0)
     return img;
   return null;
+}
+
+function drawableToCssUrl(drawable) {
+  if (!drawable) return '';
+  if (typeof HTMLCanvasElement !== 'undefined' && drawable instanceof HTMLCanvasElement) {
+    try {
+      return drawable.toDataURL('image/png');
+    } catch (_) {
+      return '';
+    }
+  }
+  if (typeof HTMLImageElement !== 'undefined' && drawable instanceof HTMLImageElement && drawable.src) return drawable.src;
+  return '';
+}
+
+function syncStageLayerImages() {
+  const bgDraw = getAssetImage('background_club_entrance');
+  const fgDraw = getAssetImage('foreground_club');
+  const bgUrl = drawableToCssUrl(bgDraw);
+  const fgUrl = drawableToCssUrl(fgDraw);
+  if (stageBackgroundEl && bgUrl) {
+    stageBackgroundEl.style.backgroundImage = `url("${bgUrl}")`;
+  }
+  if (stageForegroundEl && fgUrl) {
+    stageForegroundEl.style.backgroundImage = `url("${fgUrl}")`;
+  }
+}
+
+function triggerScreenShake(amount = 4) {
+  const a = Math.max(0, amount);
+  screenShakeMagnitude = Math.min(SCREEN_SHAKE_MAX, screenShakeMagnitude + a);
+}
+
+function tickScreenShake(dt) {
+  if (screenShakeMagnitude < 0.05) {
+    screenShakeMagnitude = 0;
+    if (gameStage) gameStage.style.transform = '';
+    return;
+  }
+  screenShakeMagnitude *= Math.pow(SCREEN_SHAKE_DECAY, dt * 60);
+  const px = screenShakeMagnitude;
+  const sx = (Math.random() * 2 - 1) * px;
+  const sy = (Math.random() * 2 - 1) * px;
+  if (gameStage) gameStage.style.transform = `translate(${sx}px, ${sy}px)`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -506,6 +559,9 @@ function resetSessionToMenu() {
   resetInspectionMenuLayout();
   punchParticles.length = 0;
   punchSparks.length = 0;
+  stationDustParticles.length = 0;
+  screenShakeMagnitude = 0;
+  if (gameStage) gameStage.style.transform = '';
   stopShiftMusicAndAlarm();
   hidePauseMenu();
   hideEndScreens();
@@ -547,6 +603,9 @@ function startShift() {
   resetInspectionMenuLayout();
   punchParticles.length = 0;
   punchSparks.length = 0;
+  stationDustParticles.length = 0;
+  screenShakeMagnitude = 0;
+  if (gameStage) gameStage.style.transform = '';
   if (typeof SoundManager !== 'undefined' && SoundManager.startBgMusic) SoundManager.startBgMusic();
   showGameHud();
   updateHUD();
@@ -727,8 +786,13 @@ function onInspectDragEnd() {
 }
 
 function notifyChaosIncrease(amount) {
-  if (amount >= 10) triggerChaosFeedback({ shake: true });
-  else if (amount >= 5) triggerChaosFeedback({ shake: false });
+  if (amount >= 10) {
+    triggerChaosFeedback({ shake: true });
+    triggerScreenShake(6);
+  } else if (amount >= 5) {
+    triggerChaosFeedback({ shake: false });
+    triggerScreenShake(2.5);
+  }
 }
 
 function triggerChaosFeedback(opts) {
@@ -759,6 +823,7 @@ function triggerChaosFeedback(opts) {
 }
 
 function triggerPunchScreenshake() {
+  triggerScreenShake(5);
   if (!hudEl) return;
   hudEl.classList.remove('hud-shake-anim');
   void hudEl.offsetWidth;
@@ -879,6 +944,59 @@ function spawnPunchSpark(x, y) {
   });
 }
 
+class StationDustParticle {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.vx = (Math.random() - 0.5) * 55;
+    this.vy = -28 - Math.random() * 42;
+    this.maxLife = 0.42 + Math.random() * 0.22;
+    this.life = this.maxLife;
+    this.r = 3.5 + Math.random() * 5.5;
+  }
+
+  update(dt) {
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    this.vy += 48 * dt;
+    this.vx *= 0.94;
+    this.life -= dt;
+  }
+
+  draw(ctx) {
+    const t = Math.max(0, this.life / this.maxLife);
+    const rad = this.r * (1.35 + (1 - t) * 0.4);
+    const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, rad);
+    g.addColorStop(0, `rgba(210, 200, 220, ${0.5 * t})`);
+    g.addColorStop(0.45, `rgba(130, 120, 145, ${0.28 * t})`);
+    g.addColorStop(1, 'rgba(70, 65, 82, 0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, rad, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function spawnStationDust(x, y, spreadHalf = 12) {
+  const n = 5 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < n; i++) {
+    stationDustParticles.push(
+      new StationDustParticle(x + (Math.random() - 0.5) * spreadHalf * 2, y)
+    );
+  }
+}
+
+function tickStationDust(dt) {
+  for (let i = stationDustParticles.length - 1; i >= 0; i--) {
+    stationDustParticles[i].update(dt);
+    if (stationDustParticles[i].life <= 0) stationDustParticles.splice(i, 1);
+  }
+}
+
+function drawStationDust(ctx) {
+  for (const p of stationDustParticles) p.draw(ctx);
+}
+
 function tickCombatFx(dt) {
   for (let i = punchParticles.length - 1; i >= 0; i--) {
     punchParticles[i].update(dt);
@@ -908,6 +1026,31 @@ function drawCombatFx(ctx) {
   }
   ctx.globalAlpha = 1;
   for (const p of punchParticles) p.draw(ctx);
+}
+
+function getNpcBodyFrameKeys(npc) {
+  return npc.spriteFrameKeys && npc.spriteFrameKeys.length >= 2
+    ? npc.spriteFrameKeys
+    : ['npc_walk_a', 'npc_walk_b'];
+}
+
+function npcWalkFramesReadyFor(npc) {
+  const keys = getNpcBodyFrameKeys(npc);
+  return !!(getAssetImage(keys[0]) && getAssetImage(keys[1]));
+}
+
+/**
+ * Body drawable: horizontal two-frame walk while moving (or custom `spriteFrameKeys`),
+ * else single `npc_base`. A real sprite sheet can be split into two asset keys.
+ */
+function getNpcBodyDrawable(npc) {
+  const keys = getNpcBodyFrameKeys(npc);
+  const dual = npcWalkFramesReadyFor(npc);
+  if (dual && npc.state === STATE_MOVING) {
+    return npc._walkFrameIndex === 0 ? getAssetImage(keys[0]) : getAssetImage(keys[1]);
+  }
+  if (dual) return getAssetImage(keys[0]);
+  return getAssetImage('npc_base');
 }
 
 function drawSpeechBubble(ctx, npc, anchorX, anchorY) {
@@ -957,6 +1100,8 @@ function drawSpeechBubble(ctx, npc, anchorX, anchorY) {
 class NPC {
   constructor(data) {
     Object.assign(this, data);
+    /** @type {string[]|null} optional asset keys [frameA, frameB] for walk cycle */
+    if (!Array.isArray(this.spriteFrameKeys) || this.spriteFrameKeys.length < 2) this.spriteFrameKeys = null;
     this.state = STATE_MOVING;
     this.size = 20;
     this.half = this.size / 2;
@@ -974,10 +1119,14 @@ class NPC {
     this._koVy = 0;
     this._facingLeft = false;
     this._hitFacingTimer = 0;
+    this._walkAccumMs = 0;
+    this._walkFrameIndex = 0;
+    this._bobPhase = Math.random() * Math.PI * 2;
   }
 
   update(dt) {
     if (this.state === STATE_KNOCKOUT) {
+      this._walkAccumMs = 0;
       this.x += this._koVx * dt;
       this.y += this._koVy * dt;
       this._facingLeft = this._koVx < 0;
@@ -994,6 +1143,7 @@ class NPC {
     }
 
     if (this.state === STATE_AGGRESSIVE) {
+      this._walkAccumMs = 0;
       this._pulse += dt * 5;
       this._shakePhase += dt * 28;
       if (this._punchFlash > 0) this._punchFlash = Math.max(0, this._punchFlash - dt);
@@ -1006,7 +1156,10 @@ class NPC {
       return;
     }
 
-    if (this.state === STATE_AT_STATION || this.state === STATE_INSPECTING) return;
+    if (this.state === STATE_AT_STATION || this.state === STATE_INSPECTING) {
+      this._walkAccumMs = 0;
+      return;
+    }
 
     const b = getStationBounds();
     const stopY = getQueueLineY(this.half);
@@ -1023,7 +1176,11 @@ class NPC {
 
     if (hitBox || dist <= 1.5) {
       this.y = Math.max(this.y, stopY);
+      if (this.state === STATE_MOVING) {
+        spawnStationDust(this.x, this.y + this.half - 2, this.half + 4);
+      }
       this.state = STATE_AT_STATION;
+      this._walkAccumMs = 0;
       repositionStationQueue();
       return;
     }
@@ -1032,6 +1189,12 @@ class NPC {
       this.x += (dx / dist) * this.speed;
       this.y += (dy / dist) * this.speed;
       this._facingLeft = this.x > stopX;
+      this._walkAccumMs += dt * 1000;
+      while (this._walkAccumMs >= NPC_WALK_FRAME_MS) {
+        this._walkAccumMs -= NPC_WALK_FRAME_MS;
+        this._walkFrameIndex = 1 - this._walkFrameIndex;
+      }
+      this._bobPhase += dt * 12;
     }
   }
 
@@ -1043,10 +1206,14 @@ class NPC {
       oy = Math.cos(this._shakePhase * 1.3) * 2.4;
     }
 
-    const px = this.x + ox;
-    const py = this.y + oy;
+    const img = getNpcBodyDrawable(this);
+    const usingSprite = !!img;
+    const bob =
+      !usingSprite && this.state === STATE_MOVING ? Math.sin(this._bobPhase) * 3.2 : 0;
 
-    const img = getAssetImage('npc_base');
+    const px = this.x + ox;
+    const py = this.y + oy + bob;
+
     const drawW = this.size * 2.15;
     const drawH = this.size * 2.85;
     const hx = drawW * 0.5;
@@ -1121,7 +1288,6 @@ class NPC {
     ctx.fillStyle = '#e8e8e8';
     ctx.font = '9px "Courier New", monospace';
     ctx.textAlign = 'center';
-    const usingSprite = !!getAssetImage('npc_base');
     const spriteLift = usingSprite ? this.size * 2.85 * 0.5 + 10 : this.half;
     const nameLift =
       atReady || this.state === STATE_AGGRESSIVE ? spriteLift + 18 : usingSprite ? spriteLift + 4 : 6;
@@ -1303,6 +1469,7 @@ function onDeny() {
 
   if (goesAggro) {
     npc.state = STATE_AGGRESSIVE;
+    npc._walkAccumMs = 0;
     npc.health = NPC_MAX_HEALTH;
     npc.maxHealth = NPC_MAX_HEALTH;
     npc._pulse = 0;
@@ -1390,19 +1557,27 @@ function gameLoop(timestamp) {
 
   if (GameState.currentStatus === STATUS.PLAYING || GameState.currentStatus === STATUS.PAUSED) {
     tickCombatFx(dt);
+    tickStationDust(dt);
     updateBouncerStationGlow(dt);
   }
 
+  tickScreenShake(dt);
   render();
   requestAnimationFrame(gameLoop);
 }
 
-function drawBackgroundClub() {
+/** Fallback if stage background layer not ready — keeps canvas non-empty. */
+function drawCanvasBackdropFallback() {
   const w = canvas.width;
   const h = canvas.height;
   const { cx, cy } = getStationBounds();
-  const img = getAssetImage('background_club');
+  const hasStageBg =
+    stageBackgroundEl &&
+    stageBackgroundEl.style.backgroundImage &&
+    stageBackgroundEl.style.backgroundImage !== 'none';
+  if (hasStageBg) return;
 
+  const img = getAssetImage('background_club_entrance');
   if (img) {
     const iw = img.width;
     const ih = img.height;
@@ -1412,16 +1587,16 @@ function drawBackgroundClub() {
     const ox = (w - dw) * 0.5;
     const oy = (h - dh) * 0.5;
     ctx.drawImage(img, ox, oy, dw, dh);
-    ctx.fillStyle = 'rgba(6, 4, 12, 0.4)';
+    ctx.fillStyle = 'rgba(6, 4, 12, 0.35)';
     ctx.fillRect(0, 0, w, h);
-  } else {
-    const g = ctx.createRadialGradient(cx, cy, 20, cx, cy, Math.max(w, h) * 0.55);
-    g.addColorStop(0, '#222232');
-    g.addColorStop(0.45, '#181824');
-    g.addColorStop(1, '#0e0e14');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, w, h);
+    return;
   }
+  const g = ctx.createRadialGradient(cx, cy, 20, cx, cy, Math.max(w, h) * 0.55);
+  g.addColorStop(0, '#222232');
+  g.addColorStop(0.45, '#181824');
+  g.addColorStop(1, '#0e0e14');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
 }
 
 function drawWorldOverlay() {
@@ -1454,16 +1629,17 @@ function drawWorldOverlay() {
 
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawBackgroundClub();
+  drawCanvasBackdropFallback();
   drawWorldOverlay();
 
   const { cx, cy } = getStationBounds();
-  ctx.fillStyle = 'rgba(123, 47, 247, 0.08)';
+  ctx.fillStyle = 'rgba(123, 47, 247, 0.06)';
   ctx.beginPath();
   ctx.arc(cx, cy, 100, 0, Math.PI * 2);
   ctx.fill();
 
   for (const npc of npcs) npc.draw(ctx);
+  drawStationDust(ctx);
   drawCombatFx(ctx);
   drawScanlines();
 }
@@ -1514,7 +1690,10 @@ function init() {
   canvas.addEventListener('click', onCanvasClick);
 
   if (typeof AssetManager !== 'undefined' && typeof AssetManager.load === 'function') {
-    AssetManager.load(() => requestAnimationFrame(gameLoop));
+    AssetManager.load(() => {
+      syncStageLayerImages();
+      requestAnimationFrame(gameLoop);
+    });
   } else {
     requestAnimationFrame(gameLoop);
   }

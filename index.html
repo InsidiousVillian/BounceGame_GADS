@@ -10,7 +10,14 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <canvas id="gameCanvas"></canvas>
+  <div id="game-stage" class="game-stage">
+    <div id="stage-background" class="stage-layer stage-background" aria-hidden="true"></div>
+    <canvas id="gameCanvas" class="stage-layer stage-canvas"></canvas>
+    <div id="bouncer-station" aria-label="Bouncer station door">
+      <span class="station-label">Bouncer Station</span>
+    </div>
+    <div id="stage-foreground" class="stage-layer stage-foreground" aria-hidden="true"></div>
+  </div>
   <div id="screen-vignette" class="screen-vignette" aria-hidden="true"></div>
 
   <div id="ui-overlay">
@@ -44,10 +51,6 @@
           </button>
         </div>
       </div>
-    </div>
-
-    <div id="bouncer-station" aria-label="Bouncer station door">
-      <span class="station-label">Bouncer Station</span>
     </div>
 
     <div id="inspection-menu" class="hidden" role="dialog" aria-modal="true" aria-labelledby="inspection-title">

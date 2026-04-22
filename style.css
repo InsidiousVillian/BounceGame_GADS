@@ -28,15 +28,54 @@ html, body {
   );
 }
 
-/* ── Canvas ────────────────────────────────────────────────── */
-#gameCanvas {
+/* ── Stage: layered club entrance → NPCs → ropes & station ─── */
+.game-stage {
   position: fixed;
   inset: 0;
-  display: block;
-  width: 100vw;
-  height: 100vh;
   z-index: 0;
+  overflow: hidden;
   background: #14141c;
+}
+
+.stage-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.stage-background {
+  z-index: 0;
+  background-color: #0a0810;
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+}
+
+.stage-canvas {
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  pointer-events: auto;
+}
+
+#bouncer-station {
+  z-index: 4;
+}
+
+.stage-foreground {
+  z-index: 3;
+  background-size: cover;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+}
+
+#gameCanvas {
+  /* legacy hook — canvas uses .stage-canvas */
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 #ui-overlay {
@@ -150,7 +189,6 @@ html, body {
   transform: translate(-50%, -50%);
   width: 160px;
   height: 160px;
-  z-index: 5;
   display: flex;
   align-items: center;
   justify-content: center;
