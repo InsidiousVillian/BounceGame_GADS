@@ -501,6 +501,7 @@ html, body {
   position: relative;
   z-index: 1;
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-top: 14px;
 }
@@ -525,6 +526,23 @@ html, body {
 
 .btn-neon:active {
   transform: translateY(0);
+}
+
+.field-value--description {
+  font-size: 11px !important;
+  line-height: 1.4 !important;
+  color: #263238 !important;
+}
+
+.btn-trait-mismatch {
+  flex: 1 1 100%;
+  color: #ffe0b2;
+  background: rgba(80, 50, 20, 0.9);
+  border-color: #ff9800;
+  box-shadow:
+    0 0 10px rgba(255, 152, 0, 0.35),
+    inset 0 0 10px rgba(255, 152, 0, 0.08);
+  letter-spacing: 1px;
 }
 
 .btn-let-in {

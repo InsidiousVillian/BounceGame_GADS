@@ -29,6 +29,18 @@
     return arr[Math.floor(Math.random() * arr.length)];
   }
 
+  const HAIR_STYLES = ['Green', 'Red', 'Black', 'Blonde', 'Blue', 'Pink'];
+  const VIBE_TYPES = ['Punk', 'Goth', 'Cyber'];
+  /** @type {Record<string, string>} */
+  const HAIR_HEX = {
+    Green: '#2e7d32',
+    Red: '#c62828',
+    Black: '#212121',
+    Blonde: '#f9a825',
+    Blue: '#1565c0',
+    Pink: '#c2185b',
+  };
+
   const PORTRAIT_COLORS = [
     '#3d5a80', '#5c4d7c', '#2d6a4f', '#8b4a4a', '#4a6670', '#6b5b3d', '#4f5d75', '#5c4033',
     '#2a5c5c', '#6a4c6a', '#455a64', '#5d4037',
@@ -142,6 +154,26 @@
       ? `AUX VERIFY: checksum digit ↔ sector prefix · secondary emboss ${pick(['Δ', 'Λ', 'Σ'])}-${Math.floor(10 + Math.random() * 89)}`
       : '';
 
+    const hairStyle = pick(HAIR_STYLES);
+    const hasPiercings = Math.random() < 0.4;
+    const vibeType = pick(VIBE_TYPES);
+
+    let idHairStyle = hairStyle;
+    let idHasPiercings = hasPiercings;
+    let idVibeType = vibeType;
+    if (!isValidID && Math.random() < 0.3) {
+      const flip = pick(['hair', 'piercings', 'vibe']);
+      if (flip === 'hair') {
+        const opts = HAIR_STYLES.filter((h) => h !== hairStyle);
+        idHairStyle = pick(opts);
+      } else if (flip === 'piercings') {
+        idHasPiercings = !hasPiercings;
+      } else {
+        const opts = VIBE_TYPES.filter((v) => v !== vibeType);
+        idVibeType = pick(opts);
+      }
+    }
+
     return {
       name,
       age,
@@ -156,8 +188,21 @@
       aggressionChance,
       portraitSvg,
       securitySealVariant,
+      hairStyle,
+      hasPiercings,
+      vibeType,
+      idHairStyle,
+      idHasPiercings,
+      idVibeType,
     };
   }
 
-  global.NPCSystem = { generateNpcData, generatePortraitShapes, portraitShapesToSvg };
+  global.NPCSystem = {
+    generateNpcData,
+    generatePortraitShapes,
+    portraitShapesToSvg,
+    HAIR_STYLES,
+    VIBE_TYPES,
+    HAIR_HEX,
+  };
 })(typeof window !== 'undefined' ? window : globalThis);

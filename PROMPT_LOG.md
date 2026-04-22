@@ -286,6 +286,36 @@ VIP rewards + rotating entry law + rule violation chaos: COMPLETE
 
 ---
 
+## Session 18 - 2026-04-22
+
+### Prompt
+**Physical traits** on NPCs vs **ID Description**; **30%** fake IDs get one wrong **`idHair` / `idPiercings` / `idVibe`**; **Let In** mismatch → **chaos**; **TRAIT MISMATCH** deny; **procedural** hair / piercings / vibe **silhouette** on **`NPC.draw`**; docs.
+
+### Tasks Completed
+- **`NPCSystem.js`:** **`HAIR_STYLES`**, **`VIBE_TYPES`**, **`HAIR_HEX`**; per NPC **`hairStyle`**, **`hasPiercings`**, **`vibeType`** + parallel **`id*`** fields; on **`!isValidID`** **30%** flip one trait on ID only.
+- **`game.js`:** **`idTraitsMismatchActual`**, **`formatIdDescriptionForCard`**, **`drawNpcTraitOverlays`**, **`TRAIT_MISMATCH_LET_IN_CHAOS`** (**12**); **`onLetIn`** requires trait match for **successful** entry; **`finalizeDeny`** + **`onTraitMismatchDeny`**; NPC constructor trait defaults.
+- **`index.html` / `style.css`:** **Description** field; **`btn-trait-mismatch`** (full-width row).
+- **Docs:** **`TO_DO.md`** — **Character Traits & Match Mechanic** **[x]**; Session 18; project summary.
+
+### Status
+Trait inspection + discrepancy denies + canvas read: COMPLETE
+
+---
+
+## Session 19 - 2026-04-22
+
+### Prompt
+**Slot-based queue** (**`QUEUE_SPACING`**, **`STATE_QUEUED`**), **`x = STATION_X - index * spacing`**; **aggro** steps down (**`+y`**), leaves line; **shuffle** on remove; **click** prioritizes **AGGRESSIVE**; **draw** aggro on top + scale + red stroke; docs.
+
+### Tasks Completed
+- **`game.js`:** **`QUEUE_SPACING` (60)**, **`STATE_QUEUED`**, **`assignQueueOrder` / `queueOrderSeq`**, **`getOrderedLineNpcs`**, **`isNpcLineFront`**; **`repositionStationQueue`** assigns **`npc.x = cx - i * QUEUE_SPACING`** and promotes/demotes head vs **QUEUED**; movers target **`stopX = cx - slotIndex * QUEUE_SPACING`**; **`removeNpc`** → **`repositionStationQueue`**; **aggro** **`AGGRO_QUEUE_STEP_Y` (50)** on deny; **`onCanvasClick`** aggro pass first; **`render`** draws aggro last; **`NPC.draw`** **`AGGRO_DRAW_SCALE` (1.08)** + **`#ff1744`** stroke; inspect / **E** only when **`isNpcLineFront`**.
+- **Docs:** **`TO_DO.md`** — **Slot-Based Queueing** **[x]**; Session 19; project summary.
+
+### Status
+Line slots + combat offset + hit priority: COMPLETE
+
+---
+
 ## Project summary — The Velvet Rope (bouncer shift simulator)
 
-Vanilla **HTML5 Canvas** + **DOM** UI: **NPCSystem** generates guests (IDs, minors, **sectors**, **VIP** 10%, aggro); queue at **bouncer station**; **PVC ID card** inspection (drag, seal, shape portraits, **VIP** ribbon / aux line); **Let In / Deny** drives **Vibe** & **Chaos**; **VIP** clean let-in = **double vibe** + **chaos** tick down; **after 60s** a **house rule** flips (**21+ only** or **no Sector 7**) with HUD sticky + toast — violating on **Let In** adds **+20 chaos**; deny can turn **aggressive** with **punch** combat and **particles**; **Call Security** tactical cooldown; **difficulty** scales every **30s**; **AssetManager** — **club entrance** + **foreground** (ropes / podium) + **two-frame NPC walk** + **POW**; **game stage** layers (**CSS** back / **canvas** characters & FX / **CSS** fore); **screen shake** on punch and large **chaos** spikes; **dust** puffs when guests halt at the rope; **SoundManager** — procedural **SFX** (punch, stamps, chaos alarm, **VIP chime**) plus **DavidKBD *Portal to Underworld*** loop routed through a **lowpass** (muffled when **paused**, full on shift + end screens); **flow** menu / pause / win / loss with **shift report** (incl. **VIPs OK**), **mistake-based grades**, and **localStorage** high scores (**most guests processed** + **best letter grade**); **vignette**, **scanlines**, and **vibe-synced** door glow for polish.
+Vanilla **HTML5 Canvas** + **DOM** UI: **NPCSystem** generates guests (IDs, minors, **sectors**, **VIP** 10%, **hair / piercings / vibe** + ID **description** fields; **fake** IDs may **misprint one trait** vs the guest); **slot queue** at the **bouncer station** (**`STATE_QUEUED`**, **`QUEUE_SPACING`** along **−X** from door center; **aggro** steps toward camera and is **click-prioritized**); **PVC ID card** inspection (drag, seal, shape portraits, **VIP** ribbon / aux line, **Description**); **Let In / Deny / Trait mismatch** drives **Vibe** & **Chaos** (wrong let-in on **trait mismatch** adds **chaos**); **VIP** clean let-in = **double vibe** + **chaos** tick down; **after 60s** a **house rule** flips (**21+ only** or **no Sector 7**) with HUD sticky + toast — violating on **Let In** adds **+20 chaos**; deny can turn **aggressive** with **punch** combat and **particles**; **Call Security** tactical cooldown; **difficulty** scales every **30s**; **AssetManager** — **club entrance** + **foreground** (ropes / podium) + **two-frame NPC walk** + **POW**; **game stage** layers (**CSS** back / **canvas** characters & FX / **CSS** fore); **NPC** overlays (**hair cap**, **piercing studs**, **Punk / Goth / Cyber** silhouette); **screen shake** on punch and large **chaos** spikes; **dust** puffs when guests halt at the rope; **SoundManager** — procedural **SFX** (punch, stamps, chaos alarm, **VIP chime**) plus **DavidKBD *Portal to Underworld*** loop routed through a **lowpass** (muffled when **paused**, full on shift + end screens); **flow** menu / pause / win / loss with **shift report** (incl. **VIPs OK**), **mistake-based grades**, and **localStorage** high scores (**most guests processed** + **best letter grade**); **vignette**, **scanlines**, and **vibe-synced** door glow for polish.

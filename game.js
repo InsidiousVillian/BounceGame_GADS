@@ -14,8 +14,13 @@ const STATION_H = 160;
 const STATE_MOVING = 'moving';
 const STATE_AT_STATION = 'atStation';
 const STATE_INSPECTING = 'inspecting';
+const STATE_QUEUED = 'queued';
 const STATE_AGGRESSIVE = 'aggressive';
 const STATE_KNOCKOUT = 'knockout';
+
+const QUEUE_SPACING = 60;
+const AGGRO_QUEUE_STEP_Y = 50;
+const AGGRO_DRAW_SCALE = 1.08;
 
 /** App / session flow */
 const STATUS = {
@@ -50,6 +55,7 @@ const RULE_STANDARD = 'standard';
 const RULE_NO_MINORS = 'no_minors';
 const RULE_NO_SECTOR_7 = 'no_sector_7';
 const RULE_VIOLATION_CHAOS = 20;
+const TRAIT_MISMATCH_LET_IN_CHAOS = 12;
 const NPC_WALK_FRAME_MS = 200;
 const SCREEN_SHAKE_DECAY = 0.82;
 const SCREEN_SHAKE_MAX = 14;
@@ -114,6 +120,7 @@ let dailyRuleTransitionDone = false;
 let dailyRuleSpecialMode = RULE_NO_MINORS;
 /** @type {ReturnType<typeof setTimeout>|null} */
 let ruleToastHideId = null;
+let queueOrderSeq = 0;
 let stationPulsePhase = 0;
 let securityCooldownRemaining = 0;
 let appliedDifficultyTier = -1;
@@ -167,6 +174,7 @@ const inspectReason = document.getElementById('inspect-reason');
 const idCardDragHandle = document.getElementById('id-card-drag-handle');
 const btnLetIn = document.getElementById('btn-let-in');
 const btnDeny = document.getElementById('btn-deny');
+const btnTraitMismatch = document.getElementById('btn-trait-mismatch');
 
 let spawnIntervalId = null;
 let lastFrameTime = 0;
@@ -634,6 +642,7 @@ function resetSessionToMenu() {
   shiftMistakes = 0;
   shiftVipSuccessCount = 0;
   resetDailyRuleState();
+  queueOrderSeq = 0;
   stationPulsePhase = 0;
   securityCooldownRemaining = 0;
   appliedDifficultyTier = -1;
@@ -680,6 +689,7 @@ function startShift() {
   shiftMistakes = 0;
   shiftVipSuccessCount = 0;
   resetDailyRuleState();
+  queueOrderSeq = 0;
   stationPulsePhase = 0;
   securityCooldownRemaining = 0;
   appliedDifficultyTier = -1;
@@ -766,6 +776,21 @@ function playCombatSound() {
 
 function isLegitGuest(npc) {
   return npc.isValidID === true && npc.isMinor === false;
+}
+
+/** ID printed traits vs what the NPC actually looks like (canvas). */
+function idTraitsMismatchActual(npc) {
+  const h = (npc.idHairStyle || '') !== (npc.hairStyle || '');
+  const p = !!npc.idHasPiercings !== !!npc.hasPiercings;
+  const v = (npc.idVibeType || '') !== (npc.vibeType || '');
+  return h || p || v;
+}
+
+function formatIdDescriptionForCard(npc) {
+  const hair = npc.idHairStyle ?? '—';
+  const pierce = npc.idHasPiercings ? 'Yes' : 'None';
+  const vibe = npc.idVibeType ?? '—';
+  return `Hair: ${hair} · Piercings: ${pierce} · Vibe: ${vibe}`;
 }
 
 function formatValidityLine(npc) {
@@ -947,20 +972,47 @@ function getQueueLineY(halfSize) {
   return getStationBounds().bottom + halfSize;
 }
 
+function assignQueueOrder(npc) {
+  if (npc._queueOrder == null) npc._queueOrder = ++queueOrderSeq;
+}
+
+function isQueueWaitingState(st) {
+  return st === STATE_AT_STATION || st === STATE_INSPECTING || st === STATE_QUEUED;
+}
+
+function getOrderedLineNpcs() {
+  return npcs
+    .filter((n) => isQueueWaitingState(n.state))
+    .sort((a, b) => (a._queueOrder ?? 1e9) - (b._queueOrder ?? 1e9));
+}
+
+function isNpcLineFront(npc) {
+  const line = getOrderedLineNpcs();
+  return line.length > 0 && line[0] === npc;
+}
+
+/**
+ * Slot-based line: index 0 at door (STATION_X), each further guest QUEUE_SPACING px left (behind).
+ */
 function repositionStationQueue() {
   if (!Array.isArray(npcs) || npcs.length === 0) return;
 
-  const atStation = npcs.filter((n) => n.state === STATE_AT_STATION || n.state === STATE_INSPECTING);
-  if (atStation.length === 0) return;
+  const line = getOrderedLineNpcs();
+  if (line.length === 0) return;
 
   const b = getStationBounds();
-  const stopY = getQueueLineY(atStation[0].half ?? 10);
-  const spacing = 28;
-  for (let i = 0; i < atStation.length; i++) {
-    const npc = atStation[i];
-    const off = (i - (atStation.length - 1) / 2) * spacing;
-    npc.x = b.cx + off;
-    npc.y = stopY;
+  for (let i = 0; i < line.length; i++) {
+    const npc = line[i];
+    npc.x = b.cx - i * QUEUE_SPACING;
+    npc.y = getQueueLineY(npc.half ?? 10);
+
+    if (i === 0) {
+      if (npc.state === STATE_QUEUED && GameState.activeNpc !== npc) {
+        npc.state = STATE_AT_STATION;
+      }
+    } else if (npc.state === STATE_AT_STATION || npc.state === STATE_INSPECTING) {
+      npc.state = STATE_QUEUED;
+    }
   }
 }
 
@@ -983,6 +1035,79 @@ function roundRectPath(ctx, x, y, w, h, r) {
   ctx.lineTo(x, y + rr);
   ctx.quadraticCurveTo(x, y, x + rr, y);
   ctx.closePath();
+}
+
+/** Hair cap, piercings, vibe silhouette — drawn in NPC-local space (center at guest feet). */
+function drawNpcTraitOverlays(ctx, npc, px, py, hx, hy, drawW, drawH, usingSprite, facingLeft, scaleMul = 1) {
+  const vibe = npc.vibeType || 'Punk';
+  const hair = npc.hairStyle || 'Black';
+  const pierce = !!npc.hasPiercings;
+  const hairHex =
+    typeof NPCSystem !== 'undefined' && NPCSystem.HAIR_HEX && NPCSystem.HAIR_HEX[hair]
+      ? NPCSystem.HAIR_HEX[hair]
+      : '#424242';
+
+  ctx.save();
+  ctx.translate(px, py);
+  if (scaleMul !== 1) ctx.scale(scaleMul, scaleMul);
+  if (facingLeft) ctx.scale(-1, 1);
+
+  const bw = usingSprite ? drawW : drawW * 0.92;
+  const bh = usingSprite ? drawH : drawH * 0.92;
+
+  if (vibe === 'Goth') {
+    ctx.fillStyle = 'rgba(28, 24, 42, 0.58)';
+    ctx.beginPath();
+    ctx.ellipse(0, 6, bw * 0.36, bh * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (vibe === 'Punk') {
+    ctx.fillStyle = 'rgba(55, 48, 62, 0.72)';
+    ctx.beginPath();
+    ctx.moveTo(-bw * 0.5, -bh * 0.12);
+    ctx.lineTo(-bw * 0.68, bh * 0.38);
+    ctx.lineTo(-bw * 0.32, bh * 0.28);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(bw * 0.5, -bh * 0.12);
+    ctx.lineTo(bw * 0.68, bh * 0.38);
+    ctx.lineTo(bw * 0.32, bh * 0.28);
+    ctx.closePath();
+    ctx.fill();
+  } else {
+    ctx.strokeStyle = 'rgba(0, 229, 255, 0.6)';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = 'rgba(0, 229, 255, 0.35)';
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.moveTo(-bw * 0.34, bh * 0.02);
+    ctx.lineTo(bw * 0.34, bh * 0.02);
+    ctx.moveTo(-bw * 0.28, bh * 0.14);
+    ctx.lineTo(bw * 0.28, bh * 0.14);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  const capW = bw * 0.5;
+  const capH = usingSprite ? 12 : 8;
+  const capY = -hy + 3;
+  ctx.fillStyle = hairHex;
+  roundRectPath(ctx, -capW / 2, capY - capH, capW, capH, 4);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.28)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  if (pierce) {
+    ctx.fillStyle = 'rgba(140, 140, 155, 0.95)';
+    const fy = -hy * 0.32;
+    ctx.beginPath();
+    ctx.arc(-bw * 0.11, fy, 2.3, 0, Math.PI * 2);
+    ctx.arc(bw * 0.13, fy - 2, 2.1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
 }
 
 function getBubbleLabel(npc) {
@@ -1194,6 +1319,12 @@ class NPC {
     Object.assign(this, data);
     /** @type {string[]|null} optional asset keys [frameA, frameB] for walk cycle */
     if (!Array.isArray(this.spriteFrameKeys) || this.spriteFrameKeys.length < 2) this.spriteFrameKeys = null;
+    if (this.hairStyle == null) this.hairStyle = 'Black';
+    if (this.hasPiercings == null) this.hasPiercings = false;
+    if (this.vibeType == null) this.vibeType = 'Punk';
+    if (this.idHairStyle == null) this.idHairStyle = this.hairStyle;
+    if (this.idHasPiercings == null) this.idHasPiercings = this.hasPiercings;
+    if (this.idVibeType == null) this.idVibeType = this.vibeType;
     this.state = STATE_MOVING;
     this.size = 20;
     this.half = this.size / 2;
@@ -1248,31 +1379,38 @@ class NPC {
       return;
     }
 
-    if (this.state === STATE_AT_STATION || this.state === STATE_INSPECTING) {
+    if (
+      this.state === STATE_AT_STATION ||
+      this.state === STATE_INSPECTING ||
+      this.state === STATE_QUEUED
+    ) {
       this._walkAccumMs = 0;
       return;
     }
 
     const b = getStationBounds();
     const stopY = getQueueLineY(this.half);
-    const stopX = b.cx;
+    const lineAhead = npcs
+      .filter((n) => n !== this && isQueueWaitingState(n.state))
+      .sort((a, c) => (a._queueOrder ?? 1e9) - (c._queueOrder ?? 1e9));
+    const slotIndex = lineAhead.length;
+    const stopX = b.cx - slotIndex * QUEUE_SPACING;
     const dx = stopX - this.x;
     const dy = stopY - this.y;
     const dist = Math.hypot(dx, dy);
 
-    const topY = this.y - this.half;
-    const hitBox =
-      topY <= b.bottom &&
-      this.x >= b.left - this.half &&
-      this.x <= b.right + this.half;
-
-    if (hitBox || dist <= 1.5) {
-      this.y = Math.max(this.y, stopY);
-      if (this.state === STATE_MOVING) {
-        spawnStationDust(this.x, this.y + this.half - 2, this.half + 4);
+    if (dist <= 3) {
+      const wasMoving = this.state === STATE_MOVING;
+      this.x = stopX;
+      this.y = stopY;
+      assignQueueOrder(this);
+      if (slotIndex === 0) {
+        this.state = STATE_AT_STATION;
+      } else {
+        this.state = STATE_QUEUED;
       }
-      this.state = STATE_AT_STATION;
       this._walkAccumMs = 0;
+      if (wasMoving) spawnStationDust(this.x, this.y + this.half - 2, this.half + 4);
       repositionStationQueue();
       return;
     }
@@ -1310,10 +1448,12 @@ class NPC {
     const drawH = this.size * 2.85;
     const hx = drawW * 0.5;
     const hy = drawH * 0.5;
+    const drawBodyScale = this.state === STATE_AGGRESSIVE ? AGGRO_DRAW_SCALE : 1;
 
     if (img) {
       ctx.save();
       ctx.translate(px, py);
+      if (drawBodyScale !== 1) ctx.scale(drawBodyScale, drawBodyScale);
       if (this._facingLeft) ctx.scale(-1, 1);
 
       let filter = 'none';
@@ -1340,6 +1480,11 @@ class NPC {
 
       ctx.restore();
     } else {
+      ctx.save();
+      ctx.translate(px, py);
+      if (drawBodyScale !== 1) ctx.scale(drawBodyScale, drawBodyScale);
+      if (this._facingLeft) ctx.scale(-1, 1);
+
       let fill = this.color;
       if (this.state === STATE_AGGRESSIVE) {
         const l = 38 + Math.sin(this._pulse) * 14;
@@ -1348,31 +1493,41 @@ class NPC {
         fill = `hsl(0, 55%, ${42 + Math.sin(this._pulse * 2) * 8}%)`;
       }
       ctx.fillStyle = fill;
-      ctx.fillRect(px - this.half, py - this.half, this.size, this.size);
+      ctx.fillRect(-this.half, -this.half, this.size, this.size);
       if (this._punchFlash > 0) {
         ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(0.92, this._punchFlash * 4)})`;
-        ctx.fillRect(px - this.half, py - this.half, this.size, this.size);
+        ctx.fillRect(-this.half, -this.half, this.size, this.size);
       }
       ctx.strokeStyle = 'rgba(0,0,0,0.35)';
       ctx.lineWidth = 1;
-      ctx.strokeRect(px - this.half + 0.5, py - this.half + 0.5, this.size - 1, this.size - 1);
+      ctx.strokeRect(-this.half + 0.5, -this.half + 0.5, this.size - 1, this.size - 1);
+      ctx.restore();
     }
 
-    if (this.state === STATE_AT_STATION || this.state === STATE_INSPECTING) {
+    drawNpcTraitOverlays(ctx, this, px, py, hx, hy, drawW, drawH, usingSprite, this._facingLeft, drawBodyScale);
+
+    if (this.state === STATE_AT_STATION || this.state === STATE_INSPECTING || this.state === STATE_QUEUED) {
+      const rx = usingSprite ? drawW * 0.5 + 2 : this.half + 2;
+      const ry = usingSprite ? drawH * 0.5 + 2 : this.half + 2;
       ctx.strokeStyle = 'rgba(224, 64, 251, 0.9)';
       ctx.lineWidth = 2;
-      ctx.strokeRect(px - this.half - 2, py - this.half - 2, this.size + 4, this.size + 4);
+      ctx.strokeRect(px - rx, py - ry, rx * 2, ry * 2);
     }
 
     if (this.state === STATE_AGGRESSIVE) {
-      ctx.strokeStyle = 'rgba(255, 80, 80, 0.9)';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(px - this.half - 2, py - this.half - 2, this.size + 4, this.size + 4);
+      const rw = ((usingSprite ? drawW : this.size) * 0.5 + 4) * drawBodyScale;
+      const rh = ((usingSprite ? drawH : this.size) * 0.5 + 4) * drawBodyScale;
+      ctx.strokeStyle = '#ff1744';
+      ctx.lineWidth = 3.5;
+      ctx.shadowColor = 'rgba(255, 23, 68, 0.75)';
+      ctx.shadowBlur = 12;
+      ctx.strokeRect(px - rw, py - rh, rw * 2, rh * 2);
+      ctx.shadowBlur = 0;
     }
 
     if (this.isVip && this.state !== STATE_KNOCKOUT) {
-      const rw = usingSprite ? drawW : this.size;
-      const rh = usingSprite ? drawH : this.size;
+      const rw = (usingSprite ? drawW : this.size) * drawBodyScale;
+      const rh = (usingSprite ? drawH : this.size) * drawBodyScale;
       ctx.save();
       ctx.translate(px, py);
       ctx.strokeStyle = 'rgba(255, 215, 130, 0.95)';
@@ -1387,7 +1542,8 @@ class NPC {
       ctx.restore();
     }
 
-    const atReady = this.state === STATE_AT_STATION || this.state === STATE_INSPECTING;
+    const atReady =
+      this.state === STATE_AT_STATION || this.state === STATE_INSPECTING || this.state === STATE_QUEUED;
     if (this.state === STATE_AGGRESSIVE) {
       drawSpeechBubble(ctx, this, px, py);
     } else if (atReady && !(this.state === STATE_INSPECTING && GameState.activeNpc === this)) {
@@ -1404,7 +1560,11 @@ class NPC {
       ctx.fillText(this.name.split(' ')[0], px, py - nameLift);
     }
 
-    if (this.state === STATE_AT_STATION && GameState.activeNpc !== this) {
+    if (
+      this.state === STATE_AT_STATION &&
+      GameState.activeNpc !== this &&
+      isNpcLineFront(this)
+    ) {
       ctx.fillStyle = '#e1bee7';
       ctx.font = 'bold 12px "Courier New", monospace';
       ctx.fillText('E', px, py - spriteLift - 8);
@@ -1412,11 +1572,13 @@ class NPC {
   }
 
   containsCanvasPoint(px, py) {
+    const sc = this.state === STATE_AGGRESSIVE ? AGGRO_DRAW_SCALE : 1;
+    const hh = this.half * sc;
     return (
-      px >= this.x - this.half &&
-      px <= this.x + this.half &&
-      py >= this.y - this.half &&
-      py <= this.y + this.half
+      px >= this.x - hh &&
+      px <= this.x + hh &&
+      py >= this.y - hh &&
+      py <= this.y + hh
     );
   }
 }
@@ -1458,6 +1620,7 @@ function hideInspection() {
 
 function showInspection(npc) {
   if (!isPlayingSession()) return;
+  if (!isNpcLineFront(npc)) return;
   resetInspectionMenuLayout();
   GameState.activeNpc = npc;
   npc.state = STATE_INSPECTING;
@@ -1494,6 +1657,9 @@ function showInspection(npc) {
 
   inspectReason.textContent = npc.reasonForEntry || '—';
 
+  const descEl = document.getElementById('inspect-description');
+  if (descEl) descEl.textContent = formatIdDescriptionForCard(npc);
+
   const sealVar =
     npc.securitySealVariant != null
       ? npc.securitySealVariant
@@ -1509,6 +1675,7 @@ function showInspection(npc) {
 function toggleInspection(npc) {
   if (!isPlayingSession()) return;
   if (npc.state !== STATE_AT_STATION && npc.state !== STATE_INSPECTING) return;
+  if (!isNpcLineFront(npc)) return;
   if (GameState.activeNpc === npc && !inspectionMenu.classList.contains('hidden')) {
     hideInspection();
     return;
@@ -1525,6 +1692,7 @@ function removeNpc(npc) {
   if (GameState.currentStatus === STATUS.PLAYING) guestsProcessed += 1;
   npcs.splice(i, 1);
   if (GameState.activeNpc === npc) GameState.activeNpc = null;
+  if (GameState.currentStatus === STATUS.PLAYING) repositionStationQueue();
 }
 
 function punchAggressiveNpc(npc) {
@@ -1557,6 +1725,7 @@ function onLetIn() {
 
   const isDocBad = !npc.isValidID || npc.isMinor;
   const ruleBlocked = letInViolatesDailyRule(npc);
+  const traitMismatch = idTraitsMismatchActual(npc);
 
   if (isDocBad) {
     GameState.addChaos(15);
@@ -1565,8 +1734,12 @@ function onLetIn() {
     GameState.addChaos(RULE_VIOLATION_CHAOS);
     triggerScreenShake(8);
   }
+  if (traitMismatch) {
+    GameState.addChaos(TRAIT_MISMATCH_LET_IN_CHAOS);
+    triggerScreenShake(4);
+  }
 
-  const successfulLetIn = !isDocBad && !ruleBlocked;
+  const successfulLetIn = !isDocBad && !ruleBlocked && !traitMismatch;
   if (successfulLetIn) {
     let vibeAmt = npc.vibeContribution * (npc.isVip ? 2 : 1);
     GameState.addVibe(vibeAmt);
@@ -1578,6 +1751,7 @@ function onLetIn() {
 
   if (isDocBad) shiftMistakes += 1;
   else if (ruleBlocked) shiftMistakes += 1;
+  else if (traitMismatch) shiftMistakes += 1;
 
   if (successfulLetIn && npc.isVip) shiftVipSuccessCount += 1;
 
@@ -1587,6 +1761,35 @@ function onLetIn() {
   updateTimerAndGuestHud();
   removeNpc(npc);
   hideInspection();
+}
+
+function finalizeDeny(npc, goesAggro) {
+  guestsDenied += 1;
+  updateTimerAndGuestHud();
+
+  inspectionMenu.classList.add('hidden');
+  GameState.activeNpc = null;
+  GameState.isPaused = false;
+
+  if (goesAggro) {
+    npc.state = STATE_AGGRESSIVE;
+    npc._walkAccumMs = 0;
+    npc.health = NPC_MAX_HEALTH;
+    npc.maxHealth = NPC_MAX_HEALTH;
+    npc._pulse = 0;
+    npc._shakePhase = 0;
+    npc._punchFlash = 0;
+    npc._hitFacingTimer = 0;
+    npc.y += AGGRO_QUEUE_STEP_Y;
+    {
+      const b = getStationBounds();
+      npc._facingLeft = npc.x > b.cx;
+    }
+    repositionStationQueue();
+    return;
+  }
+
+  removeNpc(npc);
 }
 
 function onDeny() {
@@ -1605,33 +1808,27 @@ function onDeny() {
 
   const chance = npc.aggressionChance != null ? npc.aggressionChance : 0.28;
   const goesAggro = Math.random() < chance;
+  finalizeDeny(npc, goesAggro);
+}
 
-  guestsDenied += 1;
-  updateTimerAndGuestHud();
+function onTraitMismatchDeny() {
+  if (!isPlayingSession()) return;
+  const npc = GameState.activeNpc;
+  if (!npc) return;
 
-  inspectionMenu.classList.add('hidden');
-  GameState.activeNpc = null;
-  GameState.isPaused = false;
+  if (typeof SoundManager !== 'undefined' && SoundManager.play) SoundManager.play('sfx_stamp_deny');
 
-  if (goesAggro) {
-    npc.state = STATE_AGGRESSIVE;
-    npc._walkAccumMs = 0;
-    npc.health = NPC_MAX_HEALTH;
-    npc.maxHealth = NPC_MAX_HEALTH;
-    npc._pulse = 0;
-    npc._shakePhase = 0;
-    npc._punchFlash = 0;
-    npc._hitFacingTimer = 0;
-    {
-      const b = getStationBounds();
-      npc._facingLeft = npc.x > b.cx;
-    }
-    repositionStationQueue();
-    return;
+  const mismatch = idTraitsMismatchActual(npc);
+  if (mismatch) {
+    shiftCorrectDenials += 1;
+  } else {
+    GameState.addChaos(5);
+    shiftMistakes += 1;
   }
 
-  removeNpc(npc);
-  repositionStationQueue();
+  const chance = npc.aggressionChance != null ? npc.aggressionChance : 0.28;
+  const goesAggro = Math.random() < chance;
+  finalizeDeny(npc, goesAggro);
 }
 
 function onCanvasClick(e) {
@@ -1642,14 +1839,16 @@ function onCanvasClick(e) {
   const mx = (e.clientX - rect.left) * sx;
   const my = (e.clientY - rect.top) * sy;
 
-  for (let i = npcs.length - 1; i >= 0; i--) {
-    const npc = npcs[i];
-    if (!npc.containsCanvasPoint(mx, my)) continue;
-
-    if (npc.state === STATE_AGGRESSIVE) {
+  for (const npc of npcs) {
+    if (npc.state === STATE_AGGRESSIVE && npc.containsCanvasPoint(mx, my)) {
       punchAggressiveNpc(npc);
       return;
     }
+  }
+
+  for (let i = npcs.length - 1; i >= 0; i--) {
+    const npc = npcs[i];
+    if (!npc.containsCanvasPoint(mx, my)) continue;
 
     if (npc.state === STATE_AT_STATION || npc.state === STATE_INSPECTING) {
       toggleInspection(npc);
@@ -1785,7 +1984,12 @@ function render() {
   ctx.arc(cx, cy, 100, 0, Math.PI * 2);
   ctx.fill();
 
-  for (const npc of npcs) npc.draw(ctx);
+  const drawOrder = [...npcs].sort((a, b) => {
+    const ag = a.state === STATE_AGGRESSIVE ? 1 : 0;
+    const bg = b.state === STATE_AGGRESSIVE ? 1 : 0;
+    return ag - bg;
+  });
+  for (const npc of drawOrder) npc.draw(ctx);
   drawStationDust(ctx);
   drawCombatFx(ctx);
   drawScanlines();
@@ -1835,6 +2039,7 @@ function init() {
 
   btnLetIn.addEventListener('click', onLetIn);
   btnDeny.addEventListener('click', onDeny);
+  if (btnTraitMismatch) btnTraitMismatch.addEventListener('click', onTraitMismatchDeny);
   canvas.addEventListener('click', onCanvasClick);
 
   if (typeof AssetManager !== 'undefined' && typeof AssetManager.load === 'function') {
