@@ -83,3 +83,41 @@ Fix `ReferenceError: can't access lexical declaration 'npcs' before initializati
 
 ### Status
 Initialization / TDZ bugfix: COMPLETE
+
+---
+
+## Session 6 - 2026-04-22
+
+### Prompt
+Papers, Please–style mechanics: grunge physical folder inspection UI with neon type, `reasonForEntry` + `isMinor` from **`NPCSystem.js`**, dossier fields (name, age, ID validity, reason), rule-based **Let In** / **Deny**, chaos feedback (shake / red flash), speech bubbles **!** / **?**, smoother bar width transitions, logs updated.
+
+### Tasks Completed
+- **`NPCSystem.js`:** `generateNpcData()` adds **`reasonForEntry`** (rotating excuses) and **`isMinor`** (`age < 21`). Ages **16–50** so minors appear; **`isValidID`** models fake vs real. Loaded before **`game.js`**.
+- **`#inspection-menu`:** Dark grunge folder body, paper texture overlay, **metal clip**, magenta/cyan **neon** labels; fields **`#inspect-id-validity`**, **`#inspect-reason`**; tab **ENTRY DOSSIER**.
+- **Rules — Let In:** If **fake ID** (`!isValidID`) **or** **under 21** → **Chaos +15**; else **Vibe +** `vibeContribution`. **Deny:** If guest is **legit** (`isValidID && !isMinor`) → **Chaos +5**; denying non-legit adds no chaos from this rule.
+- **Chaos feedback:** **`notifyChaosIncrease`**: gain **≥10** → HUD **shake** + chaos bar / track **red flash**; **5–9** → flash only (covers annoyed legit denial). **`GameState.addChaos`** triggers feedback.
+- **Speech bubbles:** Rounded bubble + tail toward NPC, **!** or **?** per NPC; shown at station unless that NPC’s dossier is open.
+- **Bars:** **`transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1)`** on **`.bar`** for smooth Vibe/Chaos updates.
+- **Docs:** **`TO_DO.md`** — **ID Inspection Menu** and **Vibe/Chaos Logic** marked complete (Session 6 note).
+
+### Status
+Papers Please core loop + polish: COMPLETE
+
+---
+
+## Session 7 - 2026-04-22
+
+### Prompt
+Combat when denials go wrong: **`STATE_AGGRESSIVE`** on failed deny (`aggressionChance`), pulsing red + shake, passive chaos tick, punch clicks (flash + screenshake), HP / knockout slide, aggro bubble **`#!@%`**, `console.log('POW!')` placeholder, logs updated.
+
+### Tasks Completed
+- **`NPCSystem.js`:** Restored **`aggressionChance`** (`0.14–0.62` approx.) on generated NPCs.
+- **State machine:** `STATE_MOVING` → `STATE_AT_STATION` / `STATE_INSPECTING` → on **Deny** roll → **`STATE_AGGRESSIVE`** (NPC **not** removed, menu closed) or removed if calm. **`STATE_KNOCKOUT`** after **3 punches**; sprite slides along vector away from station until off-screen, then **`removeNpc`**.
+- **Chaos:** While **any** aggressive NPC exists, **`GameState.addChaosPassive(0.1 * dt)`** per second (no spike VFX). Legit-deny **+5** still applies before aggro roll when applicable.
+- **Draw:** Aggressive fill uses **HSL red pulse**; **dual sine shake** offsets sprite + bubble; red border; speech bubble **dark red / `#!@%` in `#ff5252`**.
+- **Punch:** **`playCombatSound()`** → `console.log('POW!')`; **`_punchFlash`** white overlay; **`triggerPunchScreenshake()`** reuses HUD keyframe shake.
+- **Loop:** **`dt`** from `requestAnimationFrame`; **`tickAggroChaos`** once per frame; when inspection **paused**, still updates **aggressive** / **knockout** + passive chaos tick.
+- **Docs:** **`TO_DO.md`** — **NPC Aggro & Combat Mechanics** marked **[x]**; this session entry.
+
+### Status
+Aggro + punch + knockout combat loop: COMPLETE

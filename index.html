@@ -15,7 +15,7 @@
         <label>VIBE</label>
         <div class="bar-track"><div id="vibe-bar" class="bar vibe"></div></div>
       </div>
-      <div class="bar-group">
+      <div class="bar-group chaos-bar-group" id="chaos-bar-wrap">
         <label>CHAOS</label>
         <div class="bar-track"><div id="chaos-bar" class="bar chaos"></div></div>
       </div>
@@ -27,17 +27,26 @@
 
     <div id="inspection-menu" class="hidden" role="dialog" aria-modal="true" aria-labelledby="inspection-title">
       <div class="inspection-folder">
-        <div class="folder-tab" id="inspection-title">ID / ENTRY</div>
+        <div class="folder-tab" id="inspection-title">ENTRY DOSSIER</div>
         <div class="folder-body">
-          <div class="folder-clip"></div>
+          <div class="folder-clip" aria-hidden="true"></div>
+          <div class="folder-paper-texture"></div>
           <div class="inspection-fields">
             <div class="field-block">
-              <span class="field-label">Name</span>
+              <span class="field-label field-label--neon">Name</span>
               <p class="field-value" id="inspect-name">—</p>
             </div>
             <div class="field-block">
-              <span class="field-label">Age</span>
+              <span class="field-label field-label--neon">Age</span>
               <p class="field-value" id="inspect-age">—</p>
+            </div>
+            <div class="field-block">
+              <span class="field-label field-label--neon">ID Validity</span>
+              <p class="field-value" id="inspect-id-validity">—</p>
+            </div>
+            <div class="field-block">
+              <span class="field-label field-label--neon">Reason for Entry</span>
+              <p class="field-value field-value--multiline" id="inspect-reason">—</p>
             </div>
           </div>
           <div class="inspection-actions">
@@ -49,6 +58,7 @@
     </div>
   </div>
 
+  <script src="NPCSystem.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
