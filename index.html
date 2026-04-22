@@ -3,21 +3,29 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bouncer</title>
+  <title>The Velvet Rope</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
 
   <div id="ui-overlay">
-    <div id="hud">
-      <div class="bar-group">
-        <label>VIBE</label>
-        <div class="bar-track"><div id="vibe-bar" class="bar vibe"></div></div>
-      </div>
-      <div class="bar-group chaos-bar-group" id="chaos-bar-wrap">
-        <label>CHAOS</label>
-        <div class="bar-track"><div id="chaos-bar" class="bar chaos"></div></div>
+    <div id="game-hud-wrap" class="hidden">
+      <div id="hud">
+        <div class="hud-shift-row">
+          <div class="shift-timer-block">
+            <span class="shift-label">SHIFT</span>
+            <span id="shift-timer-display" class="shift-timer-value">2:00</span>
+          </div>
+        </div>
+        <div class="bar-group">
+          <label>VIBE</label>
+          <div class="bar-track"><div id="vibe-bar" class="bar vibe"></div></div>
+        </div>
+        <div class="bar-group chaos-bar-group" id="chaos-bar-wrap">
+          <label>CHAOS</label>
+          <div class="bar-track"><div id="chaos-bar" class="bar chaos"></div></div>
+        </div>
       </div>
     </div>
 
@@ -54,6 +62,41 @@
             <button type="button" class="btn-neon btn-deny" id="btn-deny">Deny</button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div id="pause-menu" class="flow-screen hidden" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+      <div class="flow-panel">
+        <h2 id="pause-title" class="flow-title">PAUSED</h2>
+        <p class="flow-hint">Press <kbd>ESC</kbd> to resume</p>
+        <button type="button" class="btn-flow btn-flow-primary" id="btn-resume">RESUME</button>
+      </div>
+    </div>
+
+    <div id="game-over-screen" class="flow-screen hidden" role="dialog" aria-modal="true" aria-labelledby="gameover-title">
+      <div class="flow-panel flow-panel--loss">
+        <h2 id="gameover-title" class="flow-title flow-title--loss">GAME OVER</h2>
+        <p class="flow-message">THE CLUB WAS SHUT DOWN. TOO MUCH CHAOS.</p>
+        <p class="flow-score">Guests processed: <strong id="game-over-guests">0</strong></p>
+        <button type="button" class="btn-flow btn-flow-primary" id="btn-retry-loss">RETRY</button>
+      </div>
+    </div>
+
+    <div id="win-screen" class="flow-screen hidden" role="dialog" aria-modal="true" aria-labelledby="win-title">
+      <div class="flow-panel flow-panel--win">
+        <h2 id="win-title" class="flow-title flow-title--win">SHIFT COMPLETE</h2>
+        <p class="flow-message">You survived the night. The rope holds.</p>
+        <p class="flow-score">Guests processed: <strong id="win-guests">0</strong></p>
+        <button type="button" class="btn-flow btn-flow-primary" id="btn-retry-win">RETRY</button>
+      </div>
+    </div>
+
+    <div id="main-menu" class="flow-screen flow-screen--main" role="dialog" aria-labelledby="main-title">
+      <div class="flow-panel flow-panel--main">
+        <h1 id="main-title" class="main-title">THE VELVET ROPE</h1>
+        <p class="main-tagline">Bouncer shift simulator</p>
+        <button type="button" class="btn-flow btn-flow-start" id="btn-start-shift">START SHIFT</button>
+        <p class="main-hint"><kbd>ESC</kbd> pauses during a shift</p>
       </div>
     </div>
   </div>

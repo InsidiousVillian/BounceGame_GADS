@@ -377,3 +377,219 @@ html, body {
 }
 
 .hidden { display: none !important; }
+
+/* ── In-shift HUD wrapper ─────────────────────────────────── */
+#game-hud-wrap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+  z-index: 20;
+}
+
+#game-hud-wrap #hud {
+  pointer-events: none;
+}
+
+.hud-shift-row {
+  margin-bottom: 10px;
+}
+
+.shift-timer-block {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.shift-label {
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: #b388ff;
+  text-shadow: 0 0 10px rgba(123, 47, 247, 0.5);
+}
+
+.shift-timer-value {
+  font-size: 18px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: #fff;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.25);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Flow screens (main / pause / end) ───────────────────── */
+.flow-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  background: rgba(6, 4, 10, 0.92);
+  z-index: 100;
+}
+
+.flow-screen--main {
+  z-index: 110;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(123, 47, 247, 0.18) 0%, transparent 55%),
+    rgba(6, 4, 10, 0.94);
+}
+
+.flow-panel {
+  width: min(420px, 92vw);
+  padding: 36px 32px;
+  text-align: center;
+  border: 1px solid rgba(123, 47, 247, 0.45);
+  border-radius: 14px;
+  background: linear-gradient(165deg, rgba(28, 24, 36, 0.98) 0%, rgba(12, 10, 16, 0.99) 100%);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 24px 48px rgba(0, 0, 0, 0.65),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.flow-panel--main {
+  border-color: rgba(180, 120, 255, 0.5);
+  padding: 48px 40px;
+}
+
+.flow-panel--loss {
+  border-color: rgba(255, 23, 68, 0.45);
+}
+
+.flow-panel--win {
+  border-color: rgba(0, 230, 118, 0.35);
+}
+
+.main-title {
+  font-size: clamp(1.5rem, 5vw, 2.2rem);
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: #f3e5ff;
+  text-shadow:
+    0 0 20px rgba(123, 47, 247, 0.8),
+    0 0 40px rgba(180, 80, 255, 0.35);
+  margin-bottom: 12px;
+  line-height: 1.2;
+}
+
+.main-tagline {
+  font-size: 12px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #888;
+  margin-bottom: 32px;
+}
+
+.main-hint {
+  margin-top: 24px;
+  font-size: 11px;
+  color: #666;
+  letter-spacing: 1px;
+}
+
+.flow-title {
+  font-size: 15px;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  color: #e0d4f0;
+  margin-bottom: 16px;
+}
+
+.flow-title--loss {
+  color: #ff8a80;
+  text-shadow: 0 0 16px rgba(255, 23, 68, 0.45);
+}
+
+.flow-title--win {
+  color: #b9f6ca;
+  text-shadow: 0 0 14px rgba(0, 230, 118, 0.35);
+}
+
+.flow-message {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #ccc;
+  margin-bottom: 20px;
+}
+
+.flow-hint {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 20px;
+}
+
+.flow-score {
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: #aaa;
+  margin-bottom: 28px;
+}
+
+.flow-score strong {
+  color: #fff;
+  font-size: 1.15em;
+}
+
+kbd {
+  display: inline-block;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-family: inherit;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #222;
+  color: #ccc;
+}
+
+.btn-flow {
+  display: inline-block;
+  width: 100%;
+  max-width: 280px;
+  padding: 14px 20px;
+  border: 2px solid rgba(123, 47, 247, 0.7);
+  border-radius: 8px;
+  background: rgba(40, 28, 60, 0.9);
+  color: #e8d8ff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.btn-flow:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 24px rgba(123, 47, 247, 0.35);
+}
+
+.btn-flow-primary {
+  border-color: #b388ff;
+  box-shadow: 0 0 18px rgba(123, 47, 247, 0.25);
+}
+
+.btn-flow-start {
+  border-color: #00e676;
+  color: #b9f6ca;
+  background: rgba(0, 50, 30, 0.85);
+  box-shadow:
+    0 0 20px rgba(0, 230, 118, 0.25),
+    inset 0 0 16px rgba(0, 230, 118, 0.08);
+}
+
+.btn-flow-start:hover {
+  box-shadow: 0 0 28px rgba(0, 230, 118, 0.4);
+}
+
+#pause-menu {
+  z-index: 105;
+}
+
+#game-over-screen,
+#win-screen {
+  z-index: 108;
+}

@@ -121,3 +121,24 @@ Combat when denials go wrong: **`STATE_AGGRESSIVE`** on failed deny (`aggression
 
 ### Status
 Aggro + punch + knockout combat loop: COMPLETE
+
+---
+
+## Session 8 - 2026-04-22
+
+### Prompt
+Game flow: main menu (**THE VELVET ROPE** / **START SHIFT**), **ESC** pause menu, **`GameState.currentStatus`** drives sim + spawn interval, chaos **100** → game over message, **120s** shift timer → win, **Guests processed** on end screens, **RETRY** full session reset without reload.
+
+### Tasks Completed
+- **`GameState.currentStatus`:** `MENU` | `PLAYING` | `PAUSED` | `GAMEOVER` | `WIN`. **`runSimulationStep(dt)`** runs only when **`PLAYING`** (timer, aggro tick, NPC updates with existing inspection sub-pause via **`isPaused`**). **`PAUSED`** freezes timer, chaos passives, and NPC motion.
+- **Spawn:** **`setInterval`** only active after **START SHIFT**; **`spawnNPC`** no-ops unless **`PLAYING`**. **`clearSpawnInterval`** on **GAMEOVER**, **WIN**, and **RETRY** / menu reset.
+- **Main menu:** Full-screen **`#main-menu`** (`z-index: 110`); **`#game-hud-wrap`** hidden until a shift starts; in-shift **SHIFT** countdown **`#shift-timer-display`** (`M:SS`).
+- **Pause:** **`keydown` `Escape`** toggles **`PLAYING` ↔ PAUSED`**; closes inspection via **`hideInspectionForPause`**. **`#pause-menu`** with **RESUME**.
+- **Loss:** **`chaos >= 100`** (checked after chaos changes + start of step) → **`GAMEOVER`**, exact copy: *“THE CLUB WAS SHUT DOWN. TOO MUCH CHAOS.”*
+- **Win:** **`shiftTimerRemaining <= 0`** → **`WIN`**, “Shift Complete” panel + short flavor line.
+- **Score:** **`guestsProcessed`** increments in **`removeNpc`** only while **`PLAYING`** (Let In / calm Deny / knockout off-screen).
+- **RETRY:** **`resetSessionToMenu()`** — clears NPCs, resets vibe **50**, chaos **0**, timer **120**, guests **0**, status **`MENU`**, hides HUD/end/pause, shows main menu; no page refresh.
+- **Docs:** **`TO_DO.md`** — **Game Flow (Main Menu & Game Over)** **[x]**; this entry.
+
+### Status
+Menus + win/loss + session reset: COMPLETE

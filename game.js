@@ -14,15 +14,26 @@ const STATE_INSPECTING = 'inspecting';
 const STATE_AGGRESSIVE = 'aggressive';
 const STATE_KNOCKOUT = 'knockout';
 
+/** App / session flow */
+const STATUS = {
+  MENU: 'MENU',
+  PLAYING: 'PLAYING',
+  PAUSED: 'PAUSED',
+  GAMEOVER: 'GAMEOVER',
+  WIN: 'WIN',
+};
+
 const AGGRO_CHAOS_PER_SEC = 0.1;
 const NPC_MAX_HEALTH = 3;
 const KNOCKOUT_SPEED = 520;
+const SHIFT_LENGTH_SEC = 120;
 
 const GameState = {
   vibe: 50,
   chaos: 0,
   activeNpc: null,
   isPaused: false,
+  currentStatus: STATUS.MENU,
 
   clamp(val, min = 0, max = 100) {
     return Math.max(min, Math.min(max, val));
@@ -38,17 +49,20 @@ const GameState = {
     this.chaos = this.clamp(this.chaos + amount);
     updateHUD();
     notifyChaosIncrease(amount);
+    checkGameOverChaos();
   },
 
-  /** Slow chaos drain from aggro; no spike VFX */
   addChaosPassive(amount) {
     if (amount <= 0) return;
     this.chaos = this.clamp(this.chaos + amount);
     updateHUD();
+    checkGameOverChaos();
   },
 };
 
 let npcs = [];
+let shiftTimerRemaining = SHIFT_LENGTH_SEC;
+let guestsProcessed = 0;
 
 const GRUNGE_PALETTE = [
   '#5d6d5a', '#4a5d52', '#5c6b58', '#6b7d6a',
@@ -58,9 +72,22 @@ const GRUNGE_PALETTE = [
 
 const MAX_NPCS = 14;
 
+const gameHudWrap = document.getElementById('game-hud-wrap');
+const shiftTimerDisplay = document.getElementById('shift-timer-display');
 const vibeBar = document.getElementById('vibe-bar');
 const chaosBar = document.getElementById('chaos-bar');
 const hudEl = document.getElementById('hud');
+
+const mainMenu = document.getElementById('main-menu');
+const pauseMenu = document.getElementById('pause-menu');
+const gameOverScreen = document.getElementById('game-over-screen');
+const winScreen = document.getElementById('win-screen');
+const btnStartShift = document.getElementById('btn-start-shift');
+const btnResume = document.getElementById('btn-resume');
+const btnRetryLoss = document.getElementById('btn-retry-loss');
+const btnRetryWin = document.getElementById('btn-retry-win');
+const gameOverGuestsEl = document.getElementById('game-over-guests');
+const winGuestsEl = document.getElementById('win-guests');
 
 const inspectionMenu = document.getElementById('inspection-menu');
 const inspectName = document.getElementById('inspect-name');
@@ -72,6 +99,179 @@ const btnDeny = document.getElementById('btn-deny');
 
 let spawnIntervalId = null;
 let lastFrameTime = 0;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Flow & session
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function isPlayingSession() {
+  return GameState.currentStatus === STATUS.PLAYING;
+}
+
+function clearSpawnInterval() {
+  if (spawnIntervalId) {
+    clearInterval(spawnIntervalId);
+    spawnIntervalId = null;
+  }
+}
+
+function startSpawnInterval() {
+  clearSpawnInterval();
+  spawnIntervalId = setInterval(() => {
+    if (GameState.currentStatus === STATUS.PLAYING) spawnNPC();
+  }, 6000);
+}
+
+function formatShiftTime(sec) {
+  const s = Math.max(0, Math.ceil(sec));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${String(r).padStart(2, '0')}`;
+}
+
+function updateShiftTimerDisplay() {
+  if (shiftTimerDisplay) shiftTimerDisplay.textContent = formatShiftTime(shiftTimerRemaining);
+}
+
+function showMainMenu() {
+  mainMenu.classList.remove('hidden');
+}
+
+function hideMainMenu() {
+  mainMenu.classList.add('hidden');
+}
+
+function showGameHud() {
+  gameHudWrap.classList.remove('hidden');
+}
+
+function hideGameHud() {
+  gameHudWrap.classList.add('hidden');
+}
+
+function showPauseMenu() {
+  pauseMenu.classList.remove('hidden');
+}
+
+function hidePauseMenu() {
+  pauseMenu.classList.add('hidden');
+}
+
+function hideEndScreens() {
+  gameOverScreen.classList.add('hidden');
+  winScreen.classList.add('hidden');
+}
+
+function checkGameOverChaos() {
+  if (GameState.currentStatus !== STATUS.PLAYING) return;
+  if (GameState.chaos >= 100) triggerGameOver();
+}
+
+function triggerGameOver() {
+  if (GameState.currentStatus !== STATUS.PLAYING) return;
+  GameState.currentStatus = STATUS.GAMEOVER;
+  clearSpawnInterval();
+  hideInspectionForPause();
+  hidePauseMenu();
+  hideMainMenu();
+  gameOverGuestsEl.textContent = String(guestsProcessed);
+  gameOverScreen.classList.remove('hidden');
+}
+
+function triggerWin() {
+  if (GameState.currentStatus !== STATUS.PLAYING) return;
+  GameState.currentStatus = STATUS.WIN;
+  clearSpawnInterval();
+  hideInspectionForPause();
+  hidePauseMenu();
+  hideMainMenu();
+  winGuestsEl.textContent = String(guestsProcessed);
+  winScreen.classList.remove('hidden');
+}
+
+function resetSessionToMenu() {
+  clearSpawnInterval();
+  npcs.length = 0;
+  GameState.vibe = 50;
+  GameState.chaos = 0;
+  GameState.activeNpc = null;
+  GameState.isPaused = false;
+  GameState.currentStatus = STATUS.MENU;
+  shiftTimerRemaining = SHIFT_LENGTH_SEC;
+  guestsProcessed = 0;
+  lastFrameTime = 0;
+
+  inspectionMenu.classList.add('hidden');
+  hidePauseMenu();
+  hideEndScreens();
+  hideGameHud();
+  showMainMenu();
+
+  updateHUD();
+  updateShiftTimerDisplay();
+  repositionStationQueue();
+}
+
+function startShift() {
+  hideEndScreens();
+  hideMainMenu();
+  hidePauseMenu();
+
+  npcs.length = 0;
+  GameState.vibe = 50;
+  GameState.chaos = 0;
+  GameState.activeNpc = null;
+  GameState.isPaused = false;
+  GameState.currentStatus = STATUS.PLAYING;
+  shiftTimerRemaining = SHIFT_LENGTH_SEC;
+  guestsProcessed = 0;
+  lastFrameTime = 0;
+
+  inspectionMenu.classList.add('hidden');
+  showGameHud();
+  updateHUD();
+  updateShiftTimerDisplay();
+  repositionStationQueue();
+
+  startSpawnInterval();
+  spawnNPC();
+}
+
+function togglePause() {
+  if (GameState.currentStatus === STATUS.PLAYING) {
+    GameState.currentStatus = STATUS.PAUSED;
+    hideInspectionForPause();
+    showPauseMenu();
+  } else if (GameState.currentStatus === STATUS.PAUSED) {
+    GameState.currentStatus = STATUS.PLAYING;
+    hidePauseMenu();
+  }
+}
+
+function resumeFromPause() {
+  if (GameState.currentStatus === STATUS.PAUSED) {
+    GameState.currentStatus = STATUS.PLAYING;
+    hidePauseMenu();
+  }
+}
+
+function hideInspectionForPause() {
+  inspectionMenu.classList.add('hidden');
+  if (GameState.activeNpc && GameState.activeNpc.state === STATE_INSPECTING) {
+    GameState.activeNpc.state = STATE_AT_STATION;
+  }
+  GameState.activeNpc = null;
+  GameState.isPaused = false;
+  repositionStationQueue();
+}
+
+function onKeyDown(e) {
+  if (e.key !== 'Escape') return;
+  if (GameState.currentStatus === STATUS.PLAYING || GameState.currentStatus === STATUS.PAUSED) {
+    e.preventDefault();
+    togglePause();
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -393,6 +593,7 @@ class NPC {
 }
 
 function spawnNPC() {
+  if (GameState.currentStatus !== STATUS.PLAYING) return;
   if (!Array.isArray(npcs) || npcs.length >= MAX_NPCS) return;
   if (typeof NPCSystem === 'undefined' || typeof NPCSystem.generateNpcData !== 'function') {
     console.error('NPCSystem.generateNpcData missing. Load NPCSystem.js before game.js.');
@@ -417,6 +618,7 @@ function hideInspection() {
 }
 
 function showInspection(npc) {
+  if (!isPlayingSession()) return;
   GameState.activeNpc = npc;
   npc.state = STATE_INSPECTING;
   GameState.isPaused = true;
@@ -435,6 +637,7 @@ function showInspection(npc) {
 }
 
 function toggleInspection(npc) {
+  if (!isPlayingSession()) return;
   if (npc.state !== STATE_AT_STATION && npc.state !== STATE_INSPECTING) return;
   if (GameState.activeNpc === npc && !inspectionMenu.classList.contains('hidden')) {
     hideInspection();
@@ -448,11 +651,14 @@ function toggleInspection(npc) {
 
 function removeNpc(npc) {
   const i = npcs.indexOf(npc);
-  if (i !== -1) npcs.splice(i, 1);
+  if (i === -1) return;
+  if (GameState.currentStatus === STATUS.PLAYING) guestsProcessed += 1;
+  npcs.splice(i, 1);
   if (GameState.activeNpc === npc) GameState.activeNpc = null;
 }
 
 function punchAggressiveNpc(npc) {
+  if (!isPlayingSession()) return;
   if (npc.state !== STATE_AGGRESSIVE) return;
   playCombatSound();
   npc._punchFlash = 0.22;
@@ -471,6 +677,7 @@ function punchAggressiveNpc(npc) {
 }
 
 function onLetIn() {
+  if (!isPlayingSession()) return;
   const npc = GameState.activeNpc;
   if (!npc) return;
 
@@ -486,6 +693,7 @@ function onLetIn() {
 }
 
 function onDeny() {
+  if (!isPlayingSession()) return;
   const npc = GameState.activeNpc;
   if (!npc) return;
 
@@ -516,6 +724,7 @@ function onDeny() {
 }
 
 function onCanvasClick(e) {
+  if (!isPlayingSession()) return;
   const rect = canvas.getBoundingClientRect();
   const sx = canvas.width / rect.width;
   const sy = canvas.height / rect.height;
@@ -538,9 +747,22 @@ function onCanvasClick(e) {
   }
 }
 
-function gameLoop(timestamp) {
-  const dt = lastFrameTime ? Math.min((timestamp - lastFrameTime) / 1000, 0.1) : 0;
-  lastFrameTime = timestamp;
+function runSimulationStep(dt) {
+  if (GameState.currentStatus !== STATUS.PLAYING) return;
+
+  if (GameState.chaos >= 100) {
+    triggerGameOver();
+    return;
+  }
+
+  shiftTimerRemaining -= dt;
+  if (shiftTimerRemaining <= 0) {
+    shiftTimerRemaining = 0;
+    updateShiftTimerDisplay();
+    triggerWin();
+    return;
+  }
+  updateShiftTimerDisplay();
 
   tickAggroChaos(dt);
 
@@ -552,6 +774,13 @@ function gameLoop(timestamp) {
       if (n.state === STATE_AGGRESSIVE || n.state === STATE_KNOCKOUT) n.update(dt);
     }
   }
+}
+
+function gameLoop(timestamp) {
+  const dt = lastFrameTime ? Math.min((timestamp - lastFrameTime) / 1000, 0.1) : 0;
+  lastFrameTime = timestamp;
+
+  runSimulationStep(dt);
 
   render();
   requestAnimationFrame(gameLoop);
@@ -609,10 +838,20 @@ function init() {
   resizeCanvas();
   window.addEventListener('resize', resizeCanvas);
 
-  spawnIntervalId = setInterval(spawnNPC, 6000);
-  spawnNPC();
-
+  GameState.currentStatus = STATUS.MENU;
+  clearSpawnInterval();
+  hideGameHud();
+  hidePauseMenu();
+  hideEndScreens();
+  showMainMenu();
   updateHUD();
+  updateShiftTimerDisplay();
+
+  btnStartShift.addEventListener('click', startShift);
+  btnResume.addEventListener('click', resumeFromPause);
+  btnRetryLoss.addEventListener('click', resetSessionToMenu);
+  btnRetryWin.addEventListener('click', resetSessionToMenu);
+  document.addEventListener('keydown', onKeyDown);
 
   btnLetIn.addEventListener('click', onLetIn);
   btnDeny.addEventListener('click', onDeny);
