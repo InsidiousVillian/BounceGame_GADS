@@ -316,6 +316,27 @@ Line slots + combat offset + hit priority: COMPLETE
 
 ---
 
+## Session 20 - 2026-05-11
+
+### Prompt
+Deliver **local LLM integration** for bouncer-themed patron dialogue:
+
+1. **`ollamaBridge.js`** — Robust bridge to Ollama: **`fetch`** **POST** `http://localhost:11434/api/generate`, **`async`/`await`**, **`stream: false`**, configurable **`model`** (default **`llama3`**, **`mistral`** noted as alternate), **`try`/`catch`** and HTTP/JSON guards with **`OLLAMA_FALLBACK_RESULT`** / **`buildFallbackResult`**, **`ollamaBridgeState.isModelLoading`** for UI “Thinking” / **`...`**, **CORS** guidance for **`file://`** vs **`localhost:11434`** (serve game over HTTP or proxy **`/api/generate`**).
+
+2. **`npcInterrogator.js`** (“brain”) — **`generateBouncerPrompt(npcData)`** builds a structured prompt (**`NPCData`**: **`name`**, **`race`**, **`age`**, **`reason`**, **`mood`**): persona **gritty frustrated patron in queue** (not bouncer), **one sentence max**; **`=== FEW-SHOT ===`** with **three** `Input: {JSON} -> Output: …` exemplars (**Neutral**, **`Pleading`**, **`Aggressive`**); **`=== VIBE / MOOD ===`** branches **`Aggressive`** → hostile tone, **`Pleading`** → desperate tone; **`getNPCResponse(npcData, bridgeOptions?)`** delegates to **`generateOllamaText`** and returns bridge shape (**`ok`** / **`text`** vs **`fromFallback`** / **`dialogue`**).
+
+### Tasks Completed
+- **`ollamaBridge.js`:** **`DEFAULT_OLLAMA_MODEL`**, **`OLLAMA_GENERATE_URL`**, **`generateOllamaText(prompt, options)`** (**`extraBody`**, **`signal`**), **`ollamaBridgeState`** loading flag, stable fallback object + **`alternates`**, file header-doc on **ES modules** and **CORS**.
+- **`npcInterrogator.js`:** **`formatNpcPayload`** defaults for missing fields; **`moodDirective`** for **Aggressive** / **Pleading** / default; **`generateBouncerPrompt`** sectioned **`=== PERSONA | RULES | VIBE | FEW-SHOT | YOUR TURN ===`**; **`getNPCResponse`** prompt → bridge.
+- **Note:** Scripts are **ES modules** (**`import`/`export`**). **`game.js`** is still **classic script** — wire-up (e.g. **`type="module"`** entry or small loader) and map **`NPCSystem`** fields → **`NPCData`** is **not** done in this session; modules are drop-in ready for that step.
+
+### Status
+Local Ollama bridge + NPC prompt orchestration (**`npcInterrogator`**) **[x]**; in-game HUD/speech wiring **[ ]** pending.
+
+---
+
 ## Project summary — The Velvet Rope (bouncer shift simulator)
 
 Vanilla **HTML5 Canvas** + **DOM** UI: **NPCSystem** generates guests (IDs, minors, **sectors**, **VIP** 10%, **hair / piercings / vibe** + ID **description** fields; **fake** IDs may **misprint one trait** vs the guest); **slot queue** at the **bouncer station** (**`STATE_QUEUED`**, **`QUEUE_SPACING`** along **−X** from door center; **aggro** steps toward camera and is **click-prioritized**); **PVC ID card** inspection (drag, seal, shape portraits, **VIP** ribbon / aux line, **Description**); **Let In / Deny / Trait mismatch** drives **Vibe** & **Chaos** (wrong let-in on **trait mismatch** adds **chaos**); **VIP** clean let-in = **double vibe** + **chaos** tick down; **after 60s** a **house rule** flips (**21+ only** or **no Sector 7**) with HUD sticky + toast — violating on **Let In** adds **+20 chaos**; deny can turn **aggressive** with **punch** combat and **particles**; **Call Security** tactical cooldown; **difficulty** scales every **30s**; **AssetManager** — **club entrance** + **foreground** (ropes / podium) + **two-frame NPC walk** + **POW**; **game stage** layers (**CSS** back / **canvas** characters & FX / **CSS** fore); **NPC** overlays (**hair cap**, **piercing studs**, **Punk / Goth / Cyber** silhouette); **screen shake** on punch and large **chaos** spikes; **dust** puffs when guests halt at the rope; **SoundManager** — procedural **SFX** (punch, stamps, chaos alarm, **VIP chime**) plus **DavidKBD *Portal to Underworld*** loop routed through a **lowpass** (muffled when **paused**, full on shift + end screens); **flow** menu / pause / win / loss with **shift report** (incl. **VIPs OK**), **mistake-based grades**, and **localStorage** high scores (**most guests processed** + **best letter grade**); **vignette**, **scanlines**, and **vibe-synced** door glow for polish.
+
+**LLM layer (Session 20):** **`ollamaBridge.js`** — **`fetch`** to **`POST /api/generate`** on **`localhost:11434`**, **`stream: false`**, **`DEFAULT_OLLAMA_MODEL`** (**`llama3`**, **`mistral`** documented as alternate), **`generateOllamaText`**, **`ollamaBridgeState.isModelLoading`**, fallback **`dialogue`** + **`alternates`**, CORS note for **`file://`**. **`npcInterrogator.js`** — **`generateBouncerPrompt({ name, race, age, reason, mood })`** (persona **queue patron**, **one sentence**, **few-shot** examples, **`Aggressive`** / **`Pleading`** vibe steering) and **`getNPCResponse`** → bridge; **ES modules** — hook from **`game.js`** still optional / pending.
