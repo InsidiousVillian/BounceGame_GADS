@@ -1,6 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// Declarations
+// Declarations (ES module — npcInterrogator imports ollamaBridge)
 // ═══════════════════════════════════════════════════════════════════════════════
+
+import { getNPCResponse, generateBouncerPrompt } from './npcInterrogator.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -17,6 +19,8 @@ const STATE_INSPECTING = 'inspecting';
 const STATE_QUEUED = 'queued';
 const STATE_AGGRESSIVE = 'aggressive';
 const STATE_KNOCKOUT = 'knockout';
+/** Calm denial: guest steps aside with LLM line; removed from queue so next patron can inspect. */
+const STATE_POST_DENY_LLM = 'postDenyLlm';
 
 const QUEUE_SPACING = 60;
 const AGGRO_QUEUE_STEP_Y = 50;
@@ -57,6 +61,8 @@ const RULE_NO_SECTOR_7 = 'no_sector_7';
 const RULE_VIOLATION_CHAOS = 20;
 const TRAIT_MISMATCH_LET_IN_CHAOS = 12;
 const NPC_WALK_FRAME_MS = 200;
+/** After calm deny + LLM line, remove patron from play (ms). */
+const POST_DENY_LLM_REMOVE_MS = 4200;
 const SCREEN_SHAKE_DECAY = 0.82;
 const SCREEN_SHAKE_MAX = 14;
 
@@ -175,7 +181,10 @@ const idCardDragHandle = document.getElementById('id-card-drag-handle');
 const btnLetIn = document.getElementById('btn-let-in');
 const btnDeny = document.getElementById('btn-deny');
 const btnTraitMismatch = document.getElementById('btn-trait-mismatch');
-
+const promptLogPanel = document.getElementById('prompt-log-panel');
+const promptLogEntriesEl = document.getElementById('prompt-log-entries');
+const btnPromptLogToggle = document.getElementById('btn-prompt-log-toggle');
+const promptLogBody = document.getElementById('prompt-log-body');
 let spawnIntervalId = null;
 let lastFrameTime = 0;
 
@@ -572,10 +581,12 @@ function hideMainMenu() {
 
 function showGameHud() {
   gameHudWrap.classList.remove('hidden');
+  if (promptLogPanel) promptLogPanel.hidden = false;
 }
 
 function hideGameHud() {
   gameHudWrap.classList.add('hidden');
+  if (promptLogPanel) promptLogPanel.hidden = true;
 }
 
 function showPauseMenu() {
@@ -659,6 +670,7 @@ function resetSessionToMenu() {
   stopShiftMusicAndAlarm();
   hidePauseMenu();
   hideEndScreens();
+  clearPromptLogEntries();
   hideGameHud();
   showMainMenu();
 
@@ -704,6 +716,7 @@ function startShift() {
   screenShakeMagnitude = 0;
   if (gameStage) gameStage.style.transform = '';
   if (typeof SoundManager !== 'undefined' && SoundManager.startBgMusic) SoundManager.startBgMusic();
+  clearPromptLogEntries();
   showGameHud();
   updateHUD();
   updateTimerAndGuestHud();
@@ -1115,6 +1128,206 @@ function getBubbleLabel(npc) {
   return npc.bubbleChar;
 }
 
+/** When set, replaces default ! / ? / #!@% until cleared with the patron’s LLM line. */
+function resolveBubbleDisplayedText(npc) {
+  const c = npc._bubbleCustomText;
+  if (c != null && String(c).trim() !== '') return String(c);
+  return getBubbleLabel(npc);
+}
+
+function wrapSpeechBubbleLines(ctx, text, maxInnerW, fontCss) {
+  ctx.save();
+  ctx.font = fontCss;
+  const words = String(text).split(/\s+/).filter(Boolean);
+  const lines = [];
+  let cur = '';
+  for (const w of words) {
+    const trial = cur ? `${cur} ${w}` : w;
+    if (ctx.measureText(trial).width > maxInnerW && cur) {
+      lines.push(cur);
+      cur = w;
+    } else cur = trial;
+  }
+  if (cur) lines.push(cur);
+  ctx.restore();
+  return lines.length ? lines : [''];
+}
+
+export function updatePromptLog(prompt, response, success) {
+  if (!promptLogEntriesEl) return;
+
+  const stamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const art = document.createElement('article');
+  art.className = 'prompt-log-entry' + (success ? '' : ' prompt-log-entry--fallback');
+
+  const meta = document.createElement('p');
+  meta.className = 'prompt-log-meta';
+  meta.textContent = `${stamp} · ${success ? 'OK' : 'FALLBACK / OFFLINE'}`;
+
+  const hPrompt = document.createElement('h4');
+  hPrompt.className = 'prompt-log-block-title';
+  hPrompt.textContent = 'Raw System Prompt';
+
+  const preP = document.createElement('pre');
+  preP.className = 'prompt-log-pre';
+  preP.textContent = String(prompt ?? '');
+
+  const hOut = document.createElement('h4');
+  hOut.className = 'prompt-log-block-title';
+  hOut.textContent = 'LLM Output';
+
+  const preO = document.createElement('pre');
+  preO.className = 'prompt-log-pre prompt-log-pre--output';
+  preO.textContent = String(response ?? '');
+
+  art.append(meta, hPrompt, preP, hOut, preO);
+  promptLogEntriesEl.insertBefore(art, promptLogEntriesEl.firstChild);
+}
+
+function clearPromptLogEntries() {
+  if (promptLogEntriesEl) promptLogEntriesEl.textContent = '';
+}
+
+function scheduleDenyPatronLlm(npc) {
+  const goesAggro = npc.state === STATE_AGGRESSIVE;
+  const data = {
+    name: npc.name,
+    race: npc.race != null ? String(npc.race) : 'Human',
+    age: npc.age,
+    reason: npc.reasonForEntry != null ? String(npc.reasonForEntry) : 'No reason given',
+    mood: goesAggro ? 'Aggressive' : Math.random() < 0.4 ? 'Pleading' : 'Neutral',
+  };
+  const rawPrompt = generateBouncerPrompt(data);
+  npc._bubbleCustomText = 'Thinking...';
+  npc._bubbleFallbackLine = false;
+
+  getNPCResponse(data)
+    .then((result) => {
+      if (!npcs.includes(npc)) return;
+      const ok = result.ok === true;
+      let line =
+        ok && typeof result.text === 'string'
+          ? result.text.trim()
+          : typeof result.dialogue === 'string'
+            ? result.dialogue.trim()
+            : '';
+
+      if (!line) line = ok ? '…' : '—';
+
+      npc._bubbleCustomText = line;
+      npc._bubbleFallbackLine = !ok;
+      updatePromptLog(rawPrompt, line, ok);
+
+      if (!goesAggro && npc.state === STATE_POST_DENY_LLM) {
+        window.setTimeout(() => {
+          if (npcs.includes(npc) && npc.state === STATE_POST_DENY_LLM) removeNpc(npc);
+        }, POST_DENY_LLM_REMOVE_MS);
+      }
+    })
+    .catch((err) => {
+      console.warn('[game] LLM patron line failed:', err);
+      if (!npcs.includes(npc)) return;
+      npc._bubbleCustomText = '…';
+      npc._bubbleFallbackLine = true;
+      updatePromptLog(rawPrompt, String(err && err.message ? err.message : err), false);
+      if (!goesAggro && npc.state === STATE_POST_DENY_LLM) {
+        window.setTimeout(() => {
+          if (npcs.includes(npc) && npc.state === STATE_POST_DENY_LLM) removeNpc(npc);
+        }, POST_DENY_LLM_REMOVE_MS);
+      }
+    });
+}
+
+function drawSpeechBubble(ctx, npc, anchorX, anchorY) {
+  const ax = anchorX != null ? anchorX : npc.x;
+  const ay = anchorY != null ? anchorY : npc.y;
+  const displayText = resolveBubbleDisplayedText(npc);
+  const isAggro = npc.state === STATE_AGGRESSIVE;
+  const fallbackTint = !!npc._bubbleFallbackLine;
+  const b = getStationBounds();
+  const leftSide = ax < b.cx;
+
+  const useCompactBubble =
+    npc._bubbleCustomText == null &&
+    (displayText === '!' || displayText === '?' || displayText === '#!@%');
+
+  ctx.save();
+
+  let bw;
+  let bh;
+  let bx;
+  let by;
+  let lines;
+
+  const pad = useCompactBubble ? 8 : 10;
+  let fontBubble;
+  let lineHeight;
+
+  if (useCompactBubble) {
+    bw = isAggro ? 52 : 28;
+    bh = isAggro ? 26 : 24;
+    lines = [displayText];
+    fontBubble = isAggro ? 'bold 11px "Courier New", monospace' : 'bold 15px "Courier New", monospace';
+    lineHeight = bh;
+    bx = leftSide ? ax - npc.half - bw - pad : ax + npc.half + pad;
+    by = ay - npc.half - 4;
+  } else {
+    ctx.font = isAggro ? 'bold 10px "Courier New", monospace' : '10px "Courier New", monospace';
+    fontBubble = ctx.font;
+    const maxInner = isAggro ? 168 : 152;
+    lines = wrapSpeechBubbleLines(ctx, displayText, maxInner, fontBubble);
+    lineHeight = isAggro ? 13 : 12;
+    bw = maxInner + pad * 2;
+    bh = Math.max(lineHeight + pad * 2, lines.length * lineHeight + pad * 2);
+    bx = leftSide ? ax - npc.half - bw - pad : ax + npc.half + pad;
+    by = ay - npc.half - bh * 0.25 - Math.min(lines.length * 6, 32);
+    if (by < 12) by = 12;
+  }
+
+  ctx.fillStyle = isAggro ? 'rgba(40, 12, 14, 0.95)' : 'rgba(248, 248, 255, 0.94)';
+  ctx.strokeStyle = isAggro ? 'rgba(255, 60, 60, 0.85)' : 'rgba(20, 20, 28, 0.65)';
+  ctx.lineWidth = isAggro ? 1.5 : 1.25;
+  roundRectPath(ctx, bx, by, bw, bh, 5);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = isAggro ? 'rgba(40, 12, 14, 0.95)' : 'rgba(248, 248, 255, 0.94)';
+  ctx.beginPath();
+  const tailAnchY = Math.min(by + bh - 6, ay - npc.half + 16);
+  if (leftSide) {
+    ctx.moveTo(bx + bw - 2, tailAnchY - 6);
+    ctx.lineTo(bx + bw + 7, tailAnchY);
+    ctx.lineTo(bx + bw - 2, tailAnchY + 8);
+  } else {
+    ctx.moveTo(bx + 2, tailAnchY - 6);
+    ctx.lineTo(bx - 7, tailAnchY);
+    ctx.lineTo(bx + 2, tailAnchY + 8);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  if (fallbackTint) {
+    ctx.fillStyle = isAggro ? '#7f1d1d' : '#8b2635';
+  } else {
+    ctx.fillStyle = isAggro ? '#ff5252' : '#1a1a22';
+  }
+  ctx.font = fontBubble;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  if (useCompactBubble) {
+    ctx.fillText(lines[0], bx + bw / 2, by + bh / 2 + 0.5);
+  } else {
+    const startY = by + pad + lineHeight / 2;
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], bx + bw / 2, startY + i * lineHeight);
+    }
+  }
+
+  ctx.restore();
+}
+
 class PunchParticle {
   constructor(x, y) {
     this.x = x;
@@ -1270,50 +1483,6 @@ function getNpcBodyDrawable(npc) {
   return getAssetImage('npc_base');
 }
 
-function drawSpeechBubble(ctx, npc, anchorX, anchorY) {
-  const ax = anchorX != null ? anchorX : npc.x;
-  const ay = anchorY != null ? anchorY : npc.y;
-  const label = getBubbleLabel(npc);
-  const isAggro = npc.state === STATE_AGGRESSIVE;
-  const b = getStationBounds();
-  const leftSide = ax < b.cx;
-  const bw = isAggro ? 52 : 28;
-  const bh = isAggro ? 26 : 24;
-  const pad = 8;
-  const bx = leftSide ? ax - npc.half - bw - pad : ax + npc.half + pad;
-  const by = ay - npc.half - 4;
-
-  ctx.save();
-  ctx.fillStyle = isAggro ? 'rgba(40, 12, 14, 0.95)' : 'rgba(248, 248, 255, 0.94)';
-  ctx.strokeStyle = isAggro ? 'rgba(255, 60, 60, 0.85)' : 'rgba(20, 20, 28, 0.65)';
-  ctx.lineWidth = isAggro ? 1.5 : 1.25;
-  roundRectPath(ctx, bx, by, bw, bh, 5);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = isAggro ? 'rgba(40, 12, 14, 0.95)' : 'rgba(248, 248, 255, 0.94)';
-  ctx.beginPath();
-  if (leftSide) {
-    ctx.moveTo(bx + bw - 2, by + bh - 6);
-    ctx.lineTo(bx + bw + 7, by + bh - 2);
-    ctx.lineTo(bx + bw - 2, by + bh - 12);
-  } else {
-    ctx.moveTo(bx + 2, by + bh - 6);
-    ctx.lineTo(bx - 7, by + bh - 2);
-    ctx.lineTo(bx + 2, by + bh - 12);
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = isAggro ? '#ff5252' : '#1a1a22';
-  ctx.font = isAggro ? 'bold 11px "Courier New", monospace' : 'bold 15px "Courier New", monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(label, bx + bw / 2, by + bh / 2 + 0.5);
-  ctx.restore();
-}
-
 class NPC {
   constructor(data) {
     Object.assign(this, data);
@@ -1382,7 +1551,8 @@ class NPC {
     if (
       this.state === STATE_AT_STATION ||
       this.state === STATE_INSPECTING ||
-      this.state === STATE_QUEUED
+      this.state === STATE_QUEUED ||
+      this.state === STATE_POST_DENY_LLM
     ) {
       this._walkAccumMs = 0;
       return;
@@ -1543,7 +1713,10 @@ class NPC {
     }
 
     const atReady =
-      this.state === STATE_AT_STATION || this.state === STATE_INSPECTING || this.state === STATE_QUEUED;
+      this.state === STATE_AT_STATION ||
+      this.state === STATE_INSPECTING ||
+      this.state === STATE_QUEUED ||
+      this.state === STATE_POST_DENY_LLM;
     if (this.state === STATE_AGGRESSIVE) {
       drawSpeechBubble(ctx, this, px, py);
     } else if (atReady && !(this.state === STATE_INSPECTING && GameState.activeNpc === this)) {
@@ -1763,7 +1936,8 @@ function onLetIn() {
   hideInspection();
 }
 
-function finalizeDeny(npc, goesAggro) {
+function finalizeDeny(npc, goesAggro, patronLlm) {
+  const runPatronLine = patronLlm !== false;
   guestsDenied += 1;
   updateTimerAndGuestHud();
 
@@ -1786,6 +1960,22 @@ function finalizeDeny(npc, goesAggro) {
       npc._facingLeft = npc.x > b.cx;
     }
     repositionStationQueue();
+    if (runPatronLine) scheduleDenyPatronLlm(npc);
+    return;
+  }
+
+  if (runPatronLine) {
+    npc.state = STATE_POST_DENY_LLM;
+    const bnd = getStationBounds();
+    let sideSlot = 0;
+    for (const n of npcs) {
+      if (n !== npc && n.state === STATE_POST_DENY_LLM) sideSlot++;
+    }
+    npc.x = bnd.cx + 72 + Math.min(sideSlot, 3) * 46;
+    npc.y = getQueueLineY(npc.half);
+    npc._facingLeft = npc.x > bnd.cx;
+    repositionStationQueue();
+    scheduleDenyPatronLlm(npc);
     return;
   }
 
@@ -1808,7 +1998,7 @@ function onDeny() {
 
   const chance = npc.aggressionChance != null ? npc.aggressionChance : 0.28;
   const goesAggro = Math.random() < chance;
-  finalizeDeny(npc, goesAggro);
+  finalizeDeny(npc, goesAggro, true);
 }
 
 function onTraitMismatchDeny() {
@@ -1828,7 +2018,7 @@ function onTraitMismatchDeny() {
 
   const chance = npc.aggressionChance != null ? npc.aggressionChance : 0.28;
   const goesAggro = Math.random() < chance;
-  finalizeDeny(npc, goesAggro);
+  finalizeDeny(npc, goesAggro, false);
 }
 
 function onCanvasClick(e) {
@@ -2041,6 +2231,14 @@ function init() {
   btnDeny.addEventListener('click', onDeny);
   if (btnTraitMismatch) btnTraitMismatch.addEventListener('click', onTraitMismatchDeny);
   canvas.addEventListener('click', onCanvasClick);
+
+  if (btnPromptLogToggle && promptLogPanel && promptLogBody) {
+    btnPromptLogToggle.addEventListener('click', () => {
+      promptLogPanel.classList.toggle('prompt-log-panel--collapsed');
+      const collapsed = promptLogPanel.classList.contains('prompt-log-panel--collapsed');
+      btnPromptLogToggle.setAttribute('aria-expanded', String(!collapsed));
+    });
+  }
 
   if (typeof AssetManager !== 'undefined' && typeof AssetManager.load === 'function') {
     AssetManager.load(() => {

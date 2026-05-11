@@ -1242,3 +1242,122 @@ kbd {
 #win-screen {
   z-index: 108;
 }
+
+/* ── Prompt log / LLM evidence (during shift) ───────────────── */
+.prompt-log-panel {
+  position: fixed;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  right: max(16px, env(safe-area-inset-right));
+  width: min(380px, 42vw);
+  max-height: min(52vh, 420px);
+  z-index: 92;
+  pointer-events: auto;
+  font-family: "Share Tech Mono", "Courier New", monospace;
+  font-size: 11px;
+  color: #cfd8dc;
+}
+
+.prompt-log-panel--collapsed .prompt-log-body {
+  display: none;
+}
+
+.btn-prompt-log-toggle {
+  pointer-events: auto;
+  cursor: pointer;
+  width: 100%;
+  padding: 8px 12px;
+  margin: 0 0 6px;
+  border: 1px solid rgba(167, 87, 255, 0.55);
+  border-radius: 6px;
+  background: rgba(20, 12, 32, 0.92);
+  color: #e1bee7;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+
+.btn-prompt-log-toggle:hover {
+  border-color: rgba(224, 64, 251, 0.85);
+  color: #f3e5f5;
+}
+
+.prompt-log-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: min(46vh, 360px);
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(10, 8, 14, 0.92);
+  border: 1px solid rgba(100, 100, 110, 0.45);
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.prompt-log-hint {
+  margin: 0;
+  opacity: 0.78;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.prompt-log-entries {
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 4px;
+}
+
+.prompt-log-entry {
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(28, 28, 38, 0.95);
+  border: 1px solid rgba(120, 200, 255, 0.18);
+}
+
+.prompt-log-entry--fallback {
+  border-color: rgba(198, 40, 40, 0.45);
+}
+
+.prompt-log-meta {
+  margin: 0 0 6px;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: #9e9ea8;
+}
+
+.prompt-log-entry--fallback .prompt-log-meta {
+  color: #cf8a8a;
+}
+
+.prompt-log-block-title {
+  margin: 6px 0 4px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #b39ddb;
+}
+
+.prompt-log-pre {
+  margin: 0;
+  padding: 8px;
+  max-height: 140px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 10px;
+  line-height: 1.38;
+  color: #eceff1;
+  background: rgba(4, 4, 10, 0.55);
+  border-radius: 4px;
+}
+
+.prompt-log-pre--output {
+  max-height: 100px;
+  color: #b2ebf2;
+}

@@ -178,6 +178,16 @@
       </div>
     </div>
 
+    <div id="prompt-log-panel" class="prompt-log-panel" aria-live="polite" hidden>
+      <button type="button" id="btn-prompt-log-toggle" class="btn-prompt-log-toggle" aria-expanded="true" aria-controls="prompt-log-body">
+        Prompt log / LLM
+      </button>
+      <div id="prompt-log-body" class="prompt-log-body">
+        <p class="prompt-log-hint">Portfolio: raw prompts + model output on each <strong>Deny</strong> (requires local Ollama).</p>
+        <div id="prompt-log-entries" class="prompt-log-entries"></div>
+      </div>
+    </div>
+
     <div id="main-menu" class="flow-screen flow-screen--main" role="dialog" aria-labelledby="main-title">
       <div class="flow-panel flow-panel--main">
         <h1 id="main-title" class="main-title">THE VELVET ROPE</h1>
@@ -195,6 +205,6 @@
   <script src="AssetManager.js"></script>
   <script src="SoundManager.js"></script>
   <script src="NPCSystem.js"></script>
-  <script src="game.js"></script>
+  <script type="module" src="game.js"></script>
 </body>
 </html>
