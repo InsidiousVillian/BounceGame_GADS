@@ -1320,8 +1320,12 @@ kbd {
   border: 1px solid rgba(120, 200, 255, 0.18);
 }
 
-.prompt-log-entry--fallback {
-  border-color: rgba(198, 40, 40, 0.45);
+.prompt-log-entry--greeting {
+  border-color: rgba(100, 200, 255, 0.35);
+}
+
+.prompt-log-entry--denial {
+  border-color: rgba(255, 145, 120, 0.35);
 }
 
 .prompt-log-meta {

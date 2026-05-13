@@ -2,7 +2,12 @@
 // Declarations (ES module — npcInterrogator imports ollamaBridge)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { getNPCResponse, generateBouncerPrompt } from './npcInterrogator.js';
+import {
+  getNPCResponse,
+  generateBouncerPrompt,
+  INTERACTION_GREETING,
+  INTERACTION_DENIAL,
+} from './npcInterrogator.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -750,8 +755,12 @@ function resumeFromPause() {
 function hideInspectionForPause() {
   inspectionMenu.classList.add('hidden');
   resetInspectionMenuLayout();
-  if (GameState.activeNpc && GameState.activeNpc.state === STATE_INSPECTING) {
-    GameState.activeNpc.state = STATE_AT_STATION;
+  const n = GameState.activeNpc;
+  if (n && n.state === STATE_INSPECTING) {
+    n._greetingReqId = (n._greetingReqId || 0) + 1;
+    n._bubbleCustomText = null;
+    n._bubbleFallbackLine = false;
+    n.state = STATE_AT_STATION;
   }
   GameState.activeNpc = null;
   GameState.isPaused = false;
@@ -1153,16 +1162,26 @@ function wrapSpeechBubbleLines(ctx, text, maxInnerW, fontCss) {
   return lines.length ? lines : [''];
 }
 
-export function updatePromptLog(prompt, response, success) {
+/**
+ * @param {string} prompt
+ * @param {string} response
+ * @param {boolean} success
+ * @param {'GREETING' | 'DENIAL'} [logKind] - portfolio tags [GREETING] vs [DENIAL]
+ */
+export function updatePromptLog(prompt, response, success, logKind = 'DENIAL') {
   if (!promptLogEntriesEl) return;
 
+  const tag = logKind === 'GREETING' ? 'GREETING' : 'DENIAL';
   const stamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
   const art = document.createElement('article');
-  art.className = 'prompt-log-entry' + (success ? '' : ' prompt-log-entry--fallback');
+  art.className =
+    'prompt-log-entry' +
+    (success ? '' : ' prompt-log-entry--fallback') +
+    (tag === 'GREETING' ? ' prompt-log-entry--greeting' : ' prompt-log-entry--denial');
 
   const meta = document.createElement('p');
   meta.className = 'prompt-log-meta';
-  meta.textContent = `${stamp} · ${success ? 'OK' : 'FALLBACK / OFFLINE'}`;
+  meta.textContent = `${stamp} · [${tag}] · ${success ? 'OK' : 'FALLBACK / OFFLINE'}`;
 
   const hPrompt = document.createElement('h4');
   hPrompt.className = 'prompt-log-block-title';
@@ -1188,20 +1207,71 @@ function clearPromptLogEntries() {
   if (promptLogEntriesEl) promptLogEntriesEl.textContent = '';
 }
 
-function scheduleDenyPatronLlm(npc) {
-  const goesAggro = npc.state === STATE_AGGRESSIVE;
-  const data = {
+function interrogatorPayloadFromNpc(npc, goesAggro) {
+  return {
     name: npc.name,
     race: npc.race != null ? String(npc.race) : 'Human',
     age: npc.age,
     reason: npc.reasonForEntry != null ? String(npc.reasonForEntry) : 'No reason given',
     mood: goesAggro ? 'Aggressive' : Math.random() < 0.4 ? 'Pleading' : 'Neutral',
   };
-  const rawPrompt = generateBouncerPrompt(data);
+}
+
+function interrogatorGreetingPayloadFromNpc(npc) {
+  const ch = npc.aggressionChance != null ? npc.aggressionChance : 0.28;
+  const impatient = ch > 0.36 || Math.random() < 0.45;
+  return {
+    name: npc.name,
+    race: npc.race != null ? String(npc.race) : 'Human',
+    age: npc.age,
+    reason: npc.reasonForEntry != null ? String(npc.reasonForEntry) : 'No reason given',
+    mood: impatient ? 'Impatient' : 'Nervous',
+  };
+}
+
+/**
+ * Dossier open hook: rope-check line (impatient / nervous). Uses {@link npc._greetingReqId} to drop stale replies.
+ */
+function scheduleGreetingLlm(npc, requestId) {
+  const data = interrogatorGreetingPayloadFromNpc(npc);
+  const rawPrompt = generateBouncerPrompt(data, INTERACTION_GREETING);
+
+  getNPCResponse(data, {}, INTERACTION_GREETING)
+    .then((result) => {
+      if (!npcs.includes(npc)) return;
+      if (npc._greetingReqId !== requestId) return;
+      const ok = result.ok === true;
+      let line =
+        ok && typeof result.text === 'string'
+          ? result.text.trim()
+          : typeof result.dialogue === 'string'
+            ? result.dialogue.trim()
+            : '';
+
+      if (!line) line = ok ? '…' : '—';
+
+      npc._bubbleCustomText = line;
+      npc._bubbleFallbackLine = !ok;
+      updatePromptLog(rawPrompt, line, ok, 'GREETING');
+    })
+    .catch((err) => {
+      console.warn('[game] Greeting LLM failed:', err);
+      if (!npcs.includes(npc)) return;
+      if (npc._greetingReqId !== requestId) return;
+      npc._bubbleCustomText = '…';
+      npc._bubbleFallbackLine = true;
+      updatePromptLog(rawPrompt, String(err && err.message ? err.message : err), false, 'GREETING');
+    });
+}
+
+function scheduleDenyPatronLlm(npc) {
+  const goesAggro = npc.state === STATE_AGGRESSIVE;
+  const data = interrogatorPayloadFromNpc(npc, goesAggro);
+  const rawPrompt = generateBouncerPrompt(data, INTERACTION_DENIAL);
   npc._bubbleCustomText = 'Thinking...';
   npc._bubbleFallbackLine = false;
 
-  getNPCResponse(data)
+  getNPCResponse(data, {}, INTERACTION_DENIAL)
     .then((result) => {
       if (!npcs.includes(npc)) return;
       const ok = result.ok === true;
@@ -1216,7 +1286,7 @@ function scheduleDenyPatronLlm(npc) {
 
       npc._bubbleCustomText = line;
       npc._bubbleFallbackLine = !ok;
-      updatePromptLog(rawPrompt, line, ok);
+      updatePromptLog(rawPrompt, line, ok, 'DENIAL');
 
       if (!goesAggro && npc.state === STATE_POST_DENY_LLM) {
         window.setTimeout(() => {
@@ -1229,7 +1299,7 @@ function scheduleDenyPatronLlm(npc) {
       if (!npcs.includes(npc)) return;
       npc._bubbleCustomText = '…';
       npc._bubbleFallbackLine = true;
-      updatePromptLog(rawPrompt, String(err && err.message ? err.message : err), false);
+      updatePromptLog(rawPrompt, String(err && err.message ? err.message : err), false, 'DENIAL');
       if (!goesAggro && npc.state === STATE_POST_DENY_LLM) {
         window.setTimeout(() => {
           if (npcs.includes(npc) && npc.state === STATE_POST_DENY_LLM) removeNpc(npc);
@@ -1717,9 +1787,14 @@ class NPC {
       this.state === STATE_INSPECTING ||
       this.state === STATE_QUEUED ||
       this.state === STATE_POST_DENY_LLM;
+    const inspectingSelf = this.state === STATE_INSPECTING && GameState.activeNpc === this;
+    const hasPatronSpeech =
+      this._bubbleCustomText != null && String(this._bubbleCustomText).trim() !== '';
+    const hideBubbleWhileReadingSheet = inspectingSelf && !hasPatronSpeech;
+
     if (this.state === STATE_AGGRESSIVE) {
       drawSpeechBubble(ctx, this, px, py);
-    } else if (atReady && !(this.state === STATE_INSPECTING && GameState.activeNpc === this)) {
+    } else if (atReady && !hideBubbleWhileReadingSheet) {
       drawSpeechBubble(ctx, this, px, py);
     }
 
@@ -1783,8 +1858,12 @@ function updateHUD() {
 function hideInspection() {
   inspectionMenu.classList.add('hidden');
   resetInspectionMenuLayout();
-  if (GameState.activeNpc && GameState.activeNpc.state === STATE_INSPECTING) {
-    GameState.activeNpc.state = STATE_AT_STATION;
+  const n = GameState.activeNpc;
+  if (n && n.state === STATE_INSPECTING) {
+    n._greetingReqId = (n._greetingReqId || 0) + 1;
+    n._bubbleCustomText = null;
+    n._bubbleFallbackLine = false;
+    n.state = STATE_AT_STATION;
   }
   GameState.activeNpc = null;
   GameState.isPaused = false;
@@ -1798,6 +1877,11 @@ function showInspection(npc) {
   GameState.activeNpc = npc;
   npc.state = STATE_INSPECTING;
   GameState.isPaused = true;
+
+  npc._greetingReqId = (npc._greetingReqId || 0) + 1;
+  const greetingReq = npc._greetingReqId;
+  npc._bubbleCustomText = 'Thinking...';
+  npc._bubbleFallbackLine = false;
 
   const idCardEl = document.getElementById('inspect-id-card');
   if (idCardEl) idCardEl.classList.toggle('id-card--vip', !!npc.isVip);
@@ -1843,6 +1927,8 @@ function showInspection(npc) {
 
   inspectionMenu.classList.remove('hidden');
   repositionStationQueue();
+
+  scheduleGreetingLlm(npc, greetingReq);
 }
 
 function toggleInspection(npc) {
