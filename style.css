@@ -1234,6 +1234,20 @@ kbd {
   box-shadow: 0 0 28px rgba(0, 230, 118, 0.4);
 }
 
+.btn-flow-secondary {
+  margin-top: 12px;
+  border-color: rgba(179, 136, 255, 0.55);
+  color: #d1c4e9;
+  background: rgba(28, 22, 38, 0.75);
+  box-shadow: none;
+  letter-spacing: 3px;
+  font-size: 11px;
+}
+
+.btn-flow-secondary:hover {
+  box-shadow: 0 0 18px rgba(123, 47, 247, 0.28);
+}
+
 #pause-menu {
   z-index: 105;
 }
@@ -1364,4 +1378,226 @@ kbd {
 .prompt-log-pre--output {
   max-height: 100px;
   color: #b2ebf2;
+}
+
+/* ── Tutorial onboarding ─────────────────────────────────── */
+.tutorial-root {
+  position: fixed;
+  inset: 0;
+  z-index: 92;
+  pointer-events: none;
+}
+
+.tutorial-root:not(.hidden) {
+  pointer-events: auto;
+}
+
+.tutorial-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 2, 10, 0.74);
+  pointer-events: auto;
+}
+
+.tutorial-highlight {
+  position: relative;
+  z-index: 96 !important;
+  pointer-events: auto;
+  box-shadow:
+    0 0 0 2px rgba(180, 120, 255, 0.95),
+    0 0 28px rgba(123, 47, 247, 0.55),
+    0 0 64px rgba(123, 47, 247, 0.25);
+}
+
+#inspection-menu.tutorial-highlight {
+  z-index: 96 !important;
+}
+
+.tutorial-disabled {
+  opacity: 0.28;
+  pointer-events: none !important;
+  filter: grayscale(0.6);
+}
+
+.tutorial-tooltip {
+  position: fixed;
+  left: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 98;
+  width: min(440px, calc(100vw - 32px));
+  padding: 18px 20px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(180, 120, 255, 0.55);
+  background: linear-gradient(165deg, rgba(28, 22, 38, 0.98) 0%, rgba(10, 8, 14, 0.99) 100%);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.45),
+    0 16px 40px rgba(0, 0, 0, 0.65);
+  pointer-events: auto;
+}
+
+.tutorial-step-inspect .tutorial-tooltip {
+  bottom: max(16px, env(safe-area-inset-bottom, 0px));
+}
+
+.tutorial-tooltip-text {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #e8dff5;
+  letter-spacing: 0.02em;
+}
+
+.tutorial-tooltip-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.tutorial-btn-next,
+.tutorial-btn-continue {
+  min-width: 140px;
+  padding: 10px 18px;
+  font-size: 11px;
+}
+
+.tutorial-dialogue-callout {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -120%);
+  z-index: 96;
+  width: min(360px, calc(100vw - 40px));
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: rgba(248, 248, 255, 0.96);
+  border: 1px solid rgba(20, 20, 28, 0.45);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+
+.tutorial-dialogue-label {
+  margin: 0 0 6px;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #5c4d7c;
+}
+
+.tutorial-dialogue-text {
+  margin: 0;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #1a1a22;
+}
+
+.tutorial-active #game-hud-wrap {
+  pointer-events: none;
+}
+
+.tutorial-step-decision .inspection-actions .btn-neon:not(#btn-let-in):not(#btn-deny) {
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+/* ── Queue pointer (guest line indicator) ─────────────────── */
+.guest-queue-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 35;
+}
+
+.queue-front-anchor {
+  position: fixed;
+  box-sizing: border-box;
+  pointer-events: none;
+  border-radius: 6px;
+  /* dev: outline: 1px dashed rgba(224, 64, 251, 0.35); */
+}
+
+.queue-pointer {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  z-index: 99;
+  filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.55));
+  will-change: transform, top, left;
+}
+
+.queue-pointer-icon {
+  width: 36px;
+  height: 36px;
+  position: relative;
+  animation: queue-pointer-bob 1.35s ease-in-out infinite;
+}
+
+.queue-pointer-icon::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(50% 100%, 0 38%, 18% 38%, 18% 0, 82% 0, 82% 38%, 100% 38%);
+  background: linear-gradient(180deg, #e040fb 0%, #7b2ff7 55%, #651fff 100%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.35) inset,
+    0 0 18px rgba(123, 47, 247, 0.85);
+  animation: queue-pointer-pulse 1.35s ease-in-out infinite;
+}
+
+.queue-pointer-icon::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  animation: queue-pointer-dot 1.35s ease-in-out infinite;
+}
+
+.queue-pointer--side .queue-pointer-icon {
+  transform: rotate(180deg);
+}
+
+.queue-pointer-message {
+  margin: 0;
+  max-width: min(220px, 42vw);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.4;
+  color: #f3e5ff;
+  background: rgba(12, 8, 18, 0.92);
+  border: 1px solid rgba(180, 120, 255, 0.45);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+@keyframes queue-pointer-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+
+@keyframes queue-pointer-pulse {
+  0%, 100% {
+    filter: brightness(1);
+    opacity: 1;
+  }
+  50% {
+    filter: brightness(1.18);
+    opacity: 0.92;
+  }
+}
+
+@keyframes queue-pointer-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.82); opacity: 0.75; }
 }

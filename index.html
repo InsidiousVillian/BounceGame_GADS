@@ -17,6 +17,9 @@
       <span class="station-label">Bouncer Station</span>
     </div>
     <div id="stage-foreground" class="stage-layer stage-foreground" aria-hidden="true"></div>
+    <div id="guest-queue-layer" class="guest-queue-layer" aria-hidden="true">
+      <div id="queue-front-anchor" class="queue-front-anchor hidden"></div>
+    </div>
   </div>
   <div id="screen-vignette" class="screen-vignette" aria-hidden="true"></div>
 
@@ -188,6 +191,21 @@
       </div>
     </div>
 
+    <div id="tutorial-root" class="tutorial-root hidden" aria-live="polite">
+      <div id="tutorial-scrim" class="tutorial-scrim" aria-hidden="true"></div>
+      <div id="tutorial-dialogue-callout" class="tutorial-dialogue-callout hidden">
+        <p class="tutorial-dialogue-label">Guest says</p>
+        <p id="tutorial-dialogue-text" class="tutorial-dialogue-text"></p>
+      </div>
+      <div id="tutorial-tooltip" class="tutorial-tooltip">
+        <p id="tutorial-tooltip-text" class="tutorial-tooltip-text"></p>
+        <div class="tutorial-tooltip-actions">
+          <button type="button" class="btn-flow btn-flow-primary tutorial-btn-next hidden" id="tutorial-btn-next">NEXT</button>
+          <button type="button" class="btn-flow btn-flow-primary tutorial-btn-continue hidden" id="tutorial-btn-continue">CONTINUE TO SHIFT</button>
+        </div>
+      </div>
+    </div>
+
     <div id="main-menu" class="flow-screen flow-screen--main" role="dialog" aria-labelledby="main-title">
       <div class="flow-panel flow-panel--main">
         <h1 id="main-title" class="main-title">THE VELVET ROPE</h1>
@@ -197,6 +215,7 @@
           <p class="main-high-score-body"><span id="menu-high-guests">0</span> guests processed · Best grade <strong id="menu-high-grade" class="menu-grade">—</strong></p>
         </div>
         <button type="button" class="btn-flow btn-flow-start" id="btn-start-shift">START SHIFT</button>
+        <button type="button" class="btn-flow btn-flow-secondary" id="btn-replay-tutorial">REPLAY TUTORIAL</button>
         <p class="main-hint"><kbd>ESC</kbd> pauses during a shift</p>
       </div>
     </div>

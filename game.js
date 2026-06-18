@@ -8,6 +8,8 @@ import {
   INTERACTION_GREETING,
   INTERACTION_DENIAL,
 } from './npcInterrogator.js';
+import { TutorialManager } from './TutorialManager.js';
+import { queuePointer } from './QueuePointer.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -34,6 +36,7 @@ const AGGRO_DRAW_SCALE = 1.08;
 /** App / session flow */
 const STATUS = {
   MENU: 'MENU',
+  TUTORIAL: 'TUTORIAL',
   PLAYING: 'PLAYING',
   PAUSED: 'PAUSED',
   GAMEOVER: 'GAMEOVER',
@@ -190,10 +193,14 @@ const promptLogPanel = document.getElementById('prompt-log-panel');
 const promptLogEntriesEl = document.getElementById('prompt-log-entries');
 const btnPromptLogToggle = document.getElementById('btn-prompt-log-toggle');
 const promptLogBody = document.getElementById('prompt-log-body');
+const queueFrontAnchor = document.getElementById('queue-front-anchor');
 let spawnIntervalId = null;
 let lastFrameTime = 0;
 
 const inspectMenuDrag = { active: false, offsetX: 0, offsetY: 0 };
+
+/** @type {TutorialManager|null} */
+let tutorialManager = null;
 
 function getAssetImage(key) {
   if (typeof AssetManager === 'undefined' || !AssetManager.get) return null;
@@ -255,6 +262,97 @@ function tickScreenShake(dt) {
 
 function isPlayingSession() {
   return GameState.currentStatus === STATUS.PLAYING;
+}
+
+function isTutorialSession() {
+  return GameState.currentStatus === STATUS.TUTORIAL;
+}
+
+function mountTutorialGuest(data) {
+  npcs.length = 0;
+  GameState.activeNpc = null;
+  const npc = new NPC(data);
+  npc.aggressionChance = 0;
+  const b = getStationBounds();
+  npc.x = b.cx;
+  npc.y = getQueueLineY(npc.half);
+  assignQueueOrder(npc);
+  npc.state = STATE_AT_STATION;
+  npcs.push(npc);
+  repositionStationQueue();
+  return npc;
+}
+
+function clearTutorialGuest() {
+  npcs.length = 0;
+  GameState.activeNpc = null;
+  repositionStationQueue();
+  hideQueueFrontAnchor();
+}
+
+/** Positions the invisible DOM anchor over a canvas NPC (for QueuePointer). */
+function syncQueueFrontAnchor(npc) {
+  if (!queueFrontAnchor || !canvas || !npc) {
+    hideQueueFrontAnchor();
+    return;
+  }
+  const canvasRect = canvas.getBoundingClientRect();
+  const sx = canvasRect.width / canvas.width;
+  const sy = canvasRect.height / canvas.height;
+  const drawW = npc.size * 2.15;
+  const drawH = npc.size * 2.85;
+  const screenW = drawW * sx;
+  const screenH = drawH * sy;
+  const cx = canvasRect.left + npc.x * sx;
+  const cy = canvasRect.top + npc.y * sy;
+  queueFrontAnchor.style.left = `${cx - screenW / 2}px`;
+  queueFrontAnchor.style.top = `${cy - screenH / 2}px`;
+  queueFrontAnchor.style.width = `${Math.max(24, screenW)}px`;
+  queueFrontAnchor.style.height = `${Math.max(32, screenH)}px`;
+  queueFrontAnchor.classList.remove('hidden');
+}
+
+function hideQueueFrontAnchor() {
+  if (!queueFrontAnchor) return;
+  queueFrontAnchor.classList.add('hidden');
+  queueFrontAnchor.style.left = '';
+  queueFrontAnchor.style.top = '';
+  queueFrontAnchor.style.width = '';
+  queueFrontAnchor.style.height = '';
+}
+
+const QUEUE_POINTER_HINT = 'Click to inspect';
+
+function shouldShowQueueFrontPointer() {
+  if (GameState.currentStatus !== STATUS.PLAYING) return false;
+  if (GameState.isPaused) return false;
+  if (inspectionMenu && !inspectionMenu.classList.contains('hidden')) return false;
+
+  const line = getOrderedLineNpcs();
+  if (line.length === 0) return false;
+
+  const front = line[0];
+  if (front.state !== STATE_AT_STATION) return false;
+  return isNpcLineFront(front);
+}
+
+/** Show/hide the queue arrow on the front patron during live play. */
+function updateQueueFrontPointer() {
+  if (tutorialManager?.isActive()) return;
+
+  if (!shouldShowQueueFrontPointer()) {
+    queuePointer.hidePointer();
+    hideQueueFrontAnchor();
+    return;
+  }
+
+  const front = getOrderedLineNpcs()[0];
+  syncQueueFrontAnchor(front);
+  if (!queuePointer.isVisible()) {
+    queuePointer.showPointerAt('queue-front-anchor', QUEUE_POINTER_HINT);
+  } else {
+    queuePointer.refreshPointerPosition();
+  }
 }
 
 function clearSpawnInterval() {
@@ -560,6 +658,7 @@ function updateSecurityButton() {
 }
 
 function callSecurity() {
+  if (isTutorialSession()) return;
   if (!isPlayingSession() || GameState.isPaused) return;
   if (securityCooldownRemaining > 0) return;
   if (GameState.vibe < SECURITY_VIBE_COST) return;
@@ -616,6 +715,7 @@ function triggerGameOver() {
   if (GameState.currentStatus !== STATUS.PLAYING) return;
   GameState.currentStatus = STATUS.GAMEOVER;
   clearSpawnInterval();
+  updateQueueFrontPointer();
   hideInspectionForPause();
   hidePauseMenu();
   hideMainMenu();
@@ -630,6 +730,7 @@ function triggerWin() {
   if (GameState.currentStatus !== STATUS.PLAYING) return;
   GameState.currentStatus = STATUS.WIN;
   clearSpawnInterval();
+  updateQueueFrontPointer();
   hideInspectionForPause();
   hidePauseMenu();
   hideMainMenu();
@@ -678,6 +779,7 @@ function resetSessionToMenu() {
   clearPromptLogEntries();
   hideGameHud();
   showMainMenu();
+  updateQueueFrontPointer();
 
   updateHUD();
   updateTimerAndGuestHud();
@@ -685,7 +787,7 @@ function resetSessionToMenu() {
   updateMainMenuHighScore();
 }
 
-function startShift() {
+function startShift(options = {}) {
   hideEndScreens();
   hideMainMenu();
   hidePauseMenu();
@@ -695,7 +797,6 @@ function startShift() {
   GameState.chaos = 0;
   GameState.activeNpc = null;
   GameState.isPaused = false;
-  GameState.currentStatus = STATUS.PLAYING;
   shiftTimerRemaining = SHIFT_LENGTH_SEC;
   guestsProcessed = 0;
   guestsLetIn = 0;
@@ -713,6 +814,7 @@ function startShift() {
   currentSpawnIntervalMs = BASE_SPAWN_MS;
   lastFrameTime = 0;
 
+  clearSpawnInterval();
   inspectionMenu.classList.add('hidden');
   resetInspectionMenuLayout();
   punchParticles.length = 0;
@@ -727,8 +829,19 @@ function startShift() {
   updateTimerAndGuestHud();
   repositionStationQueue();
 
+  GameState.currentStatus = STATUS.TUTORIAL;
+  if (tutorialManager) {
+    tutorialManager.start(beginLiveShift, { force: options.forceTutorial === true });
+  } else {
+    beginLiveShift();
+  }
+}
+
+function beginLiveShift() {
+  GameState.currentStatus = STATUS.PLAYING;
   startSpawnInterval();
   spawnNPC();
+  updateQueueFrontPointer();
 }
 
 function togglePause() {
@@ -736,10 +849,12 @@ function togglePause() {
     GameState.currentStatus = STATUS.PAUSED;
     hideInspectionForPause();
     showPauseMenu();
+    updateQueueFrontPointer();
     if (typeof SoundManager !== 'undefined' && SoundManager.setMusicMuffled) SoundManager.setMusicMuffled(true);
   } else if (GameState.currentStatus === STATUS.PAUSED) {
     GameState.currentStatus = STATUS.PLAYING;
     hidePauseMenu();
+    updateQueueFrontPointer();
     if (typeof SoundManager !== 'undefined' && SoundManager.setMusicMuffled) SoundManager.setMusicMuffled(false);
   }
 }
@@ -748,6 +863,7 @@ function resumeFromPause() {
   if (GameState.currentStatus === STATUS.PAUSED) {
     GameState.currentStatus = STATUS.PLAYING;
     hidePauseMenu();
+    updateQueueFrontPointer();
     if (typeof SoundManager !== 'undefined' && SoundManager.setMusicMuffled) SoundManager.setMusicMuffled(false);
   }
 }
@@ -768,6 +884,8 @@ function hideInspectionForPause() {
 }
 
 function onKeyDown(e) {
+  if (tutorialManager?.blocksKeyboard(e)) return;
+
   if (e.key === 'Escape') {
     if (GameState.currentStatus === STATUS.PLAYING || GameState.currentStatus === STATUS.PAUSED) {
       e.preventDefault();
@@ -1036,12 +1154,14 @@ function repositionStationQueue() {
       npc.state = STATE_QUEUED;
     }
   }
+  updateQueueFrontPointer();
 }
 
 function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
   repositionStationQueue();
+  updateQueueFrontPointer();
 }
 
 function roundRectPath(ctx, x, y, w, h, r) {
@@ -1868,20 +1988,31 @@ function hideInspection() {
   GameState.activeNpc = null;
   GameState.isPaused = false;
   repositionStationQueue();
+  updateQueueFrontPointer();
 }
 
-function showInspection(npc) {
-  if (!isPlayingSession()) return;
-  if (!isNpcLineFront(npc)) return;
+function showInspection(npc, options = {}) {
+  if (!isPlayingSession() && !isTutorialSession()) return;
+  if (!isTutorialSession() && !isNpcLineFront(npc)) return;
   resetInspectionMenuLayout();
   GameState.activeNpc = npc;
   npc.state = STATE_INSPECTING;
   GameState.isPaused = true;
 
+  const skipGreeting = options.skipGreeting === true;
   npc._greetingReqId = (npc._greetingReqId || 0) + 1;
   const greetingReq = npc._greetingReqId;
-  npc._bubbleCustomText = 'Thinking...';
-  npc._bubbleFallbackLine = false;
+
+  if (options.staticGreeting != null) {
+    npc._bubbleCustomText = String(options.staticGreeting);
+    npc._bubbleFallbackLine = false;
+  } else if (skipGreeting) {
+    npc._bubbleCustomText = null;
+    npc._bubbleFallbackLine = false;
+  } else {
+    npc._bubbleCustomText = 'Thinking...';
+    npc._bubbleFallbackLine = false;
+  }
 
   const idCardEl = document.getElementById('inspect-id-card');
   if (idCardEl) idCardEl.classList.toggle('id-card--vip', !!npc.isVip);
@@ -1928,7 +2059,8 @@ function showInspection(npc) {
   inspectionMenu.classList.remove('hidden');
   repositionStationQueue();
 
-  scheduleGreetingLlm(npc, greetingReq);
+  if (!skipGreeting) scheduleGreetingLlm(npc, greetingReq);
+  updateQueueFrontPointer();
 }
 
 function toggleInspection(npc) {
@@ -1978,6 +2110,7 @@ function punchAggressiveNpc(npc) {
 }
 
 function onLetIn() {
+  if (tutorialManager?.isActive()) return;
   if (!isPlayingSession()) return;
   const npc = GameState.activeNpc;
   if (!npc) return;
@@ -2069,6 +2202,7 @@ function finalizeDeny(npc, goesAggro, patronLlm) {
 }
 
 function onDeny() {
+  if (tutorialManager?.isActive()) return;
   if (!isPlayingSession()) return;
   const npc = GameState.activeNpc;
   if (!npc) return;
@@ -2088,6 +2222,7 @@ function onDeny() {
 }
 
 function onTraitMismatchDeny() {
+  if (tutorialManager?.isActive()) return;
   if (!isPlayingSession()) return;
   const npc = GameState.activeNpc;
   if (!npc) return;
@@ -2108,6 +2243,7 @@ function onTraitMismatchDeny() {
 }
 
 function onCanvasClick(e) {
+  if (isTutorialSession()) return;
   if (!isPlayingSession()) return;
   const rect = canvas.getBoundingClientRect();
   const sx = canvas.width / rect.width;
@@ -2134,6 +2270,7 @@ function onCanvasClick(e) {
 }
 
 function runSimulationStep(dt) {
+  if (GameState.currentStatus === STATUS.TUTORIAL) return;
   if (GameState.currentStatus !== STATUS.PLAYING) return;
 
   tickSecurityCooldown(dt);
@@ -2165,6 +2302,8 @@ function runSimulationStep(dt) {
       if (n.state === STATE_AGGRESSIVE || n.state === STATE_KNOCKOUT) n.update(dt);
     }
   }
+
+  updateQueueFrontPointer();
 }
 
 function gameLoop(timestamp) {
@@ -2177,7 +2316,11 @@ function gameLoop(timestamp) {
     tickSecurityCooldown(dt);
   }
 
-  if (GameState.currentStatus === STATUS.PLAYING || GameState.currentStatus === STATUS.PAUSED) {
+  if (
+    GameState.currentStatus === STATUS.PLAYING ||
+    GameState.currentStatus === STATUS.PAUSED ||
+    GameState.currentStatus === STATUS.TUTORIAL
+  ) {
     tickCombatFx(dt);
     tickStationDust(dt);
     updateBouncerStationGlow(dt);
@@ -2303,7 +2446,38 @@ function init() {
   updateMainMenuHighScore();
   updateDailyRuleHud();
 
-  btnStartShift.addEventListener('click', startShift);
+  tutorialManager = new TutorialManager({
+    elements: {
+      root: document.getElementById('tutorial-root'),
+      uiOverlay: document.getElementById('ui-overlay'),
+      inspectionMenu,
+      idCard: document.getElementById('inspect-id-card'),
+      inspectActions: inspectionMenu?.querySelector('.inspection-actions'),
+      dialogueCallout: document.getElementById('tutorial-dialogue-callout'),
+      dialogueText: document.getElementById('tutorial-dialogue-text'),
+      tooltip: document.getElementById('tutorial-tooltip'),
+      tooltipText: document.getElementById('tutorial-tooltip-text'),
+      btnNext: document.getElementById('tutorial-btn-next'),
+      btnContinue: document.getElementById('tutorial-btn-continue'),
+      btnLetIn,
+      btnDeny,
+      btnTraitMismatch,
+    },
+    callbacks: {
+      mountTutorialGuest,
+      clearTutorialGuest,
+      syncQueueFrontAnchor,
+      hideQueueFrontAnchor,
+      showInspection,
+      hideInspection,
+    },
+  });
+
+  btnStartShift.addEventListener('click', () => startShift());
+  const btnReplayTutorial = document.getElementById('btn-replay-tutorial');
+  if (btnReplayTutorial) {
+    btnReplayTutorial.addEventListener('click', () => startShift({ forceTutorial: true }));
+  }
   btnResume.addEventListener('click', resumeFromPause);
   btnRetryLoss.addEventListener('click', resetSessionToMenu);
   btnRetryWin.addEventListener('click', resetSessionToMenu);
