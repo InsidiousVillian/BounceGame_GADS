@@ -86,4 +86,31 @@ I was pleasantly surprised that attendees immediately understood and enjoyed the
 
 ## Final Judgement
 
-This external critique session was invaluable. It forced me to shift my perspective from "the system technically works" to "does it feel good to play?" The experience highlighted that in AI-assisted game development, technical robustness must be paired with excellent player feedback loops.
+This playtest session—and the iteration that followed—changed how we think about building the game. Below is a concise summary of what shaped the prototype, what we chose not to do, and what we learned about critique.
+
+### Feedback That Shaped the Refinements
+
+Two main streams of feedback drove the final design:
+
+**1. Flexibility over hardcoded logic**  
+Early critique warned that static, scripted behaviour would feel repetitive quickly. That pushed us toward a more modular architecture: guest data and rules live in structured JSON-style data rather than being buried in one-off code. Combined with an async dialogue queue, we could change content and “vibe shifts” without rewriting core systems.
+
+**2. Juice and tension**  
+Feedback about how the game *felt* led to polish work on UI, audio, and moment-to-moment feedback. Small cues—search results, decision buttons, tutorial pointers, HUD reactions—were tuned so each loop carries weight, not just mechanical correctness.
+
+### Feedback We Chose to Decline (And Why)
+
+**Traditional linear progression**  
+Some suggestions pointed toward predictable power-ups and standard gameified progression (permanent upgrades from bribes, clearer “level-up” loops). We declined that direction on purpose. *The Velvet Rope* is built around tension, atmosphere, and social commentary—not a conventional reward ladder. Adding obvious progression would have watered down the core experience and the unpredictability that makes each night feel different.
+
+Other declined items from playtesting (latency fixes via cloud AI, full animations, voice acting) stayed out for practical and brief-related reasons—see the table above.
+
+### What This Changed About Critique and Iteration
+
+**AI as an architecture partner**  
+Iteration showed that AI tools are most useful when they help design *systems*—edge cases, data flow, queue behaviour, integration bugs—not just one-off snippets. That compressed the dev cycle and let us refactor faster.
+
+**Filtering for vision**  
+AI and playtest feedback can suggest many paths. The developer still has to edit ruthlessly: not every optimisation or feature serves the game’s thesis. Real iteration means improving the *infrastructure* in service of a clear creative goal—not accepting every good-sounding idea.
+
+**Bottom line:** External critique moved us from “does the system work?” to “does it feel good to play?” For an AI-assisted prototype, technical soundness only matters if players understand the loop, feel the tension, and want another run.
